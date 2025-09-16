@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertPrayerRecordSchema, insertAchievementSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
 // Helper function to calculate and update user statistics
@@ -136,12 +137,25 @@ function groupRecordsByWeek(records: any[]): Array<{ completionRate: number }> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Get prayer record for a specific date
-  app.get("/api/prayers/:date", async (req, res) => {
+  // Set up authentication middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      // For demo purposes, using a default user ID
-      // In a real app, this would come from authentication
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Get prayer record for a specific date
+  app.get("/api/prayers/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
       const { date } = req.params;
       
       // Add cache control headers to prevent 304 responses
@@ -160,9 +174,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update prayer record
-  app.post("/api/prayers", async (req, res) => {
+  app.post("/api/prayers", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const validatedData = insertPrayerRecordSchema.parse({ ...req.body, userId });
       
       // Add cache control headers
@@ -175,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const record = await storage.updatePrayerRecord(
         validatedData.userId!,
         validatedData.date,
-        validatedData.prayers
+        validatedData.prayers as any
       );
       
       // Automatically update user statistics after saving prayer record
@@ -189,9 +203,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get prayer records for a date range
-  app.get("/api/prayers", async (req, res) => {
+  app.get("/api/prayers", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const { startDate, endDate } = req.query;
       
       // Add cache control headers
@@ -215,9 +229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user achievements
-  app.get("/api/achievements", async (req, res) => {
+  app.get("/api/achievements", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       
       // Add cache control headers
       res.set({
@@ -235,9 +249,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create achievement
-  app.post("/api/achievements", async (req, res) => {
+  app.post("/api/achievements", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const validatedData = insertAchievementSchema.parse({ ...req.body, userId });
       
       // Add cache control headers
@@ -256,9 +270,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user statistics
-  app.get("/api/stats", async (req, res) => {
+  app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       let stats = await storage.getUserStats(userId);
       
       if (!stats) {
@@ -281,9 +295,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user statistics
-  app.patch("/api/stats", async (req, res) => {
+  app.patch("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const updates = req.body;
       
       // Add cache control headers
