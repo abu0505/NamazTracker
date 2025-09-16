@@ -11,6 +11,7 @@ import {
   Legend,
   ArcElement,
   BarElement,
+  Filler,
 } from 'chart.js';
 import { useQuery } from '@tanstack/react-query';
 import { getTrendDataForPeriod, getAnalyticsDataForPeriod, getPeriodSummary } from '../lib/prayer-utils';
@@ -25,7 +26,8 @@ ChartJS.register(
   Tooltip,
   Legend,
   ArcElement,
-  BarElement
+  BarElement,
+  Filler
 );
 
 export function AnalyticsCharts() {
