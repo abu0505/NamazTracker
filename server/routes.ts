@@ -4,6 +4,137 @@ import { storage } from "./storage";
 import { insertPrayerRecordSchema, insertAchievementSchema } from "@shared/schema";
 import { z } from "zod";
 
+// Helper function to calculate and update user statistics
+async function updateUserStatistics(userId: string): Promise<void> {
+  try {
+    // Get all prayer records for the user
+    const allRecords = await storage.getPrayerRecords(userId);
+    
+    let totalPrayers = 0;
+    let onTimePrayers = 0;
+    let qazaPrayers = 0;
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let perfectWeeks = 0;
+    
+    // Sort records by date for streak calculation
+    const sortedRecords = allRecords.sort((a, b) => b.date.localeCompare(a.date));
+    
+    // Calculate current streak (from most recent date backwards)
+    let streakBroken = false;
+    for (const record of sortedRecords) {
+      if (!streakBroken && record.prayers) {
+        const dayPrayers = Object.values(record.prayers);
+        const allCompleted = dayPrayers.every(prayer => prayer.completed);
+        
+        if (allCompleted) {
+          currentStreak++;
+        } else {
+          streakBroken = true;
+        }
+      }
+    }
+    
+    // Calculate historical streaks to find best streak
+    let tempStreak = 0;
+    const chronologicalRecords = allRecords.sort((a, b) => a.date.localeCompare(b.date));
+    
+    for (const record of chronologicalRecords) {
+      if (record.prayers) {
+        const dayPrayers = Object.values(record.prayers);
+        
+        // Count prayers for totals
+        dayPrayers.forEach(prayer => {
+          totalPrayers++;
+          if (prayer.completed) {
+            if (prayer.onTime) {
+              onTimePrayers++;
+            }
+          } else {
+            qazaPrayers++;
+          }
+        });
+        
+        // Check streak
+        const allCompleted = dayPrayers.every(prayer => prayer.completed);
+        if (allCompleted) {
+          tempStreak++;
+          bestStreak = Math.max(bestStreak, tempStreak);
+        } else {
+          tempStreak = 0;
+        }
+      }
+    }
+    
+    // Calculate perfect weeks
+    const weekGroups = groupRecordsByWeek(chronologicalRecords);
+    perfectWeeks = weekGroups.filter(week => week.completionRate === 100).length;
+    
+    // Ensure best streak includes current streak
+    bestStreak = Math.max(bestStreak, currentStreak);
+    
+    // Update or create user statistics
+    let userStats = await storage.getUserStats(userId);
+    
+    if (userStats) {
+      await storage.updateUserStats(userId, {
+        totalPrayers: totalPrayers - qazaPrayers, // Only count completed prayers
+        onTimePrayers,
+        qazaPrayers,
+        currentStreak,
+        bestStreak,
+        perfectWeeks,
+        lastStreakUpdate: new Date().toISOString().split('T')[0],
+        updatedAt: new Date(),
+      });
+    } else {
+      await storage.createUserStats({
+        userId,
+        totalPrayers: totalPrayers - qazaPrayers,
+        onTimePrayers,
+        qazaPrayers,
+        currentStreak,
+        bestStreak,
+        perfectWeeks,
+        lastStreakUpdate: new Date().toISOString().split('T')[0],
+      });
+    }
+  } catch (error) {
+    console.error('Failed to update user statistics:', error);
+  }
+}
+
+// Helper function to group records by week
+function groupRecordsByWeek(records: any[]): Array<{ completionRate: number }> {
+  const weeks: { [key: string]: { completed: number; total: number } } = {};
+  
+  records.forEach(record => {
+    const date = new Date(record.date);
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - (date.getDay() === 0 ? 6 : date.getDay() - 1));
+    const weekKey = weekStart.toISOString().split('T')[0];
+    
+    if (!weeks[weekKey]) {
+      weeks[weekKey] = { completed: 0, total: 0 };
+    }
+    
+    if (record.prayers) {
+      Object.values(record.prayers).forEach((prayer: any) => {
+        weeks[weekKey].total++;
+        if (prayer.completed) {
+          weeks[weekKey].completed++;
+        }
+      });
+    }
+  });
+  
+  return Object.values(weeks)
+    .filter(week => week.total >= 35) // Only count complete weeks (7 days * 5 prayers)
+    .map(week => ({
+      completionRate: week.total > 0 ? Math.round((week.completed / week.total) * 100) : 0
+    }));
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get prayer record for a specific date
   app.get("/api/prayers/:date", async (req, res) => {
@@ -46,6 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.date,
         validatedData.prayers
       );
+      
+      // Automatically update user statistics after saving prayer record
+      await updateUserStatistics(userId);
       
       res.json(record);
     } catch (error: unknown) {

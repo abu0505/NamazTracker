@@ -862,3 +862,248 @@ export function getQazaCount(): number {
   
   return qazaCount;
 }
+
+// Enhanced API-based streak calculation
+export async function calculateCurrentStreakFromAPI(): Promise<number> {
+  try {
+    const today = new Date();
+    let streak = 0;
+    let checkDate = new Date(today);
+    
+    // Go backwards day by day to find consecutive prayer completion
+    while (true) {
+      const dateString = checkDate.toISOString().split('T')[0];
+      const record = await apiService.getPrayerRecord(dateString);
+      
+      if (record && record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          // Check if all 5 prayers were completed for this day
+          const allCompleted = Object.values(prayers).every(prayer => prayer.completed);
+          if (allCompleted) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else {
+            break; // Streak broken
+          }
+        } else {
+          break;
+        }
+      } else {
+        // No record means no prayers completed
+        break;
+      }
+      
+      // Limit to reasonable check period (1 year)
+      if (streak > 365) break;
+    }
+    
+    return streak;
+  } catch (error) {
+    console.error('Failed to calculate streak from API:', error);
+    return getCurrentStreak(); // Fallback to localStorage
+  }
+}
+
+// Enhanced API-based qaza count calculation
+export async function calculateQazaCountFromAPI(): Promise<number> {
+  try {
+    const { startDate, endDate, dates } = getDateRangeForPeriod('month');
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    let qazaCount = 0;
+    
+    dates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          if (!prayer.completed) {
+            qazaCount++;
+          }
+        });
+      } else {
+        // No record means all 5 prayers missed
+        qazaCount += 5;
+      }
+    });
+    
+    return qazaCount;
+  } catch (error) {
+    console.error('Failed to calculate qaza count from API:', error);
+    return getQazaCount(); // Fallback to localStorage
+  }
+}
+
+// Calculate comprehensive user statistics
+export async function calculateUserStatistics(userId?: string): Promise<{
+  totalPrayers: number;
+  onTimePrayers: number;
+  qazaPrayers: number;
+  currentStreak: number;
+  bestStreak: number;
+  perfectWeeks: number;
+}> {
+  try {
+    // Get data for the past year to calculate comprehensive stats
+    const { startDate, endDate } = getDateRangeForPeriod('year');
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    let totalPrayers = 0;
+    let onTimePrayers = 0;
+    let qazaPrayers = 0;
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let perfectWeeks = 0;
+    
+    // Calculate current streak
+    currentStreak = await calculateCurrentStreakFromAPI();
+    
+    // Calculate historical streaks to find best streak
+    let tempStreak = 0;
+    const sortedRecords = records.sort((a, b) => a.date.localeCompare(b.date));
+    
+    sortedRecords.forEach(record => {
+      if (record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          // Count prayers for this day
+          Object.values(prayers).forEach(prayer => {
+            totalPrayers++;
+            if (prayer.completed) {
+              if (prayer.onTime) {
+                onTimePrayers++;
+              }
+            } else {
+              qazaPrayers++;
+            }
+          });
+          
+          // Check if all prayers completed for streak calculation
+          const allCompleted = Object.values(prayers).every(prayer => prayer.completed);
+          if (allCompleted) {
+            tempStreak++;
+            bestStreak = Math.max(bestStreak, tempStreak);
+          } else {
+            tempStreak = 0;
+          }
+        }
+      } else {
+        // No prayers recorded - break streak and add to qaza
+        qazaPrayers += 5;
+        tempStreak = 0;
+      }
+    });
+    
+    // Calculate perfect weeks
+    const weekGroups = getWeekGroupsFromRecords(records);
+    perfectWeeks = weekGroups.filter(week => week.completionRate === 100).length;
+    
+    return {
+      totalPrayers: totalPrayers - qazaPrayers, // Only count completed prayers
+      onTimePrayers,
+      qazaPrayers,
+      currentStreak,
+      bestStreak: Math.max(bestStreak, currentStreak),
+      perfectWeeks,
+    };
+  } catch (error) {
+    console.error('Failed to calculate user statistics:', error);
+    return {
+      totalPrayers: 0,
+      onTimePrayers: 0,
+      qazaPrayers: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      perfectWeeks: 0,
+    };
+  }
+}
+
+// Helper function to group records by week
+function getWeekGroupsFromRecords(records: any[]): Array<{ completionRate: number }> {
+  const weeks: { [key: string]: { completed: number; total: number } } = {};
+  
+  records.forEach(record => {
+    const date = new Date(record.date);
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - (date.getDay() === 0 ? 6 : date.getDay() - 1));
+    const weekKey = weekStart.toISOString().split('T')[0];
+    
+    if (!weeks[weekKey]) {
+      weeks[weekKey] = { completed: 0, total: 0 };
+    }
+    
+    if (record.prayers) {
+      const prayers = convertPrayerRecordToDailyPrayers(record);
+      if (prayers) {
+        Object.values(prayers).forEach(prayer => {
+          weeks[weekKey].total++;
+          if (prayer.completed) {
+            weeks[weekKey].completed++;
+          }
+        });
+      }
+    } else {
+      weeks[weekKey].total += 5;
+    }
+  });
+  
+  return Object.values(weeks).map(week => ({
+    completionRate: week.total > 0 ? Math.round((week.completed / week.total) * 100) : 0
+  }));
+}
+
+// Update user statistics in backend
+export async function updateUserStatisticsInBackend(newPrayers: DailyPrayers): Promise<void> {
+  try {
+    // Calculate comprehensive statistics
+    const stats = await calculateUserStatistics();
+    
+    // Update the backend with new statistics
+    await apiService.updateUserStats({
+      totalPrayers: stats.totalPrayers,
+      onTimePrayers: stats.onTimePrayers,
+      qazaPrayers: stats.qazaPrayers,
+      currentStreak: stats.currentStreak,
+      bestStreak: stats.bestStreak,
+      perfectWeeks: stats.perfectWeeks,
+      lastStreakUpdate: getTodayString(),
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('Failed to update user statistics in backend:', error);
+  }
+}
+
+// Real-time statistics calculation for immediate UI updates
+export function calculateRealTimeStatistics(newPrayers: DailyPrayers, currentStats: any): {
+  currentStreak: number;
+  qazaCount: number;
+  shouldUpdateBackend: boolean;
+} {
+  const todayCompleted = getTodayCompletedCount(newPrayers);
+  const todayPerfect = todayCompleted === 5;
+  
+  // Calculate immediate streak impact
+  let newCurrentStreak = currentStats.currentStreak || 0;
+  let qazaChange = 0;
+  
+  // Count missed prayers for today
+  const missedToday = 5 - todayCompleted;
+  
+  // If today is perfect, potentially extend streak
+  if (todayPerfect) {
+    // We'll verify this with API call later
+    newCurrentStreak = currentStats.currentStreak + 1;
+  } else if (missedToday > 0) {
+    // Reset streak if prayers were missed
+    newCurrentStreak = 0;
+    qazaChange = missedToday;
+  }
+  
+  return {
+    currentStreak: newCurrentStreak,
+    qazaCount: (currentStats.qazaCount || 0) + qazaChange,
+    shouldUpdateBackend: true, // Always update backend for accuracy
+  };
+}

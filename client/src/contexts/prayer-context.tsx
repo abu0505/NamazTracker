@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PrayerType, PrayerStatus } from '@shared/schema';
-import { calculateWeekProgress, calculateWeekProgressFromAPI, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates } from '@/lib/prayer-utils';
+import { calculateWeekProgress, calculateWeekProgressFromAPI, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates, calculateCurrentStreakFromAPI, calculateQazaCountFromAPI, calculateRealTimeStatistics, updateUserStatisticsInBackend } from '@/lib/prayer-utils';
 import { useToast } from '@/hooks/use-toast';
 import { apiService, convertPrayerRecordToDailyPrayers } from '@/lib/api-service';
 
@@ -19,6 +19,7 @@ export interface PrayerContextType {
   qazaCount: number;
   togglePrayer: (prayer: PrayerType) => void;
   isLoading: boolean;
+  refreshStatistics: () => Promise<void>;
 }
 
 const PrayerContext = createContext<PrayerContextType | undefined>(undefined);
@@ -100,26 +101,52 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      // Fallback to localStorage if API fails
-      const streak = localStorage.getItem('currentStreak');
-      const qaza = localStorage.getItem('qazaCount');
-      
-      if (streak) setCurrentStreak(parseInt(streak));
-      if (qaza) setQazaCount(parseInt(qaza));
+      // If no API stats, calculate from scratch
+      try {
+        const calculatedStreak = await calculateCurrentStreakFromAPI();
+        const calculatedQaza = await calculateQazaCountFromAPI();
+        
+        setCurrentStreak(calculatedStreak);
+        setQazaCount(calculatedQaza);
+        
+        // Save calculated values to localStorage
+        localStorage.setItem('currentStreak', calculatedStreak.toString());
+        localStorage.setItem('qazaCount', calculatedQaza.toString());
+        
+        // Update backend with calculated values
+        await updateUserStatisticsInBackend({ fajr: { completed: false, onTime: false }, dhuhr: { completed: false, onTime: false }, asr: { completed: false, onTime: false }, maghrib: { completed: false, onTime: false }, isha: { completed: false, onTime: false } });
+      } catch (error) {
+        console.warn('Failed to calculate statistics from API, falling back to localStorage:', error);
+        
+        // Final fallback to localStorage
+        const streak = localStorage.getItem('currentStreak');
+        const qaza = localStorage.getItem('qazaCount');
+        
+        setCurrentStreak(streak ? parseInt(streak) : 0);
+        setQazaCount(qaza ? parseInt(qaza) : 0);
+      }
     } catch (error) {
       console.error('Failed to load user stats:', error);
       // Fallback to localStorage on error
       const streak = localStorage.getItem('currentStreak');
       const qaza = localStorage.getItem('qazaCount');
       
-      if (streak) setCurrentStreak(parseInt(streak));
-      if (qaza) setQazaCount(parseInt(qaza));
+      setCurrentStreak(streak ? parseInt(streak) : 0);
+      setQazaCount(qaza ? parseInt(qaza) : 0);
     }
   };
 
   const saveTodayPrayers = async (prayers: DailyPrayers) => {
     try {
       const today = getTodayString();
+      
+      // Calculate real-time statistics for immediate UI updates
+      const currentStats = { currentStreak, qazaCount };
+      const realTimeStats = calculateRealTimeStatistics(prayers, currentStats);
+      
+      // Update UI immediately with calculated values
+      setCurrentStreak(realTimeStats.currentStreak);
+      setQazaCount(realTimeStats.qazaCount);
       
       // Save to localStorage immediately for fast UI updates
       localStorage.setItem(`prayers-${today}`, JSON.stringify(prayers));
@@ -140,6 +167,26 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to get week progress from API, falling back to localStorage:', error);
         progress = calculateWeekProgress();
         setWeekProgress(progress);
+      }
+      
+      // Update comprehensive statistics in background
+      if (realTimeStats.shouldUpdateBackend) {
+        try {
+          await updateUserStatisticsInBackend(prayers);
+          
+          // Fetch updated statistics from backend for accuracy
+          const updatedStats = await apiService.getUserStats();
+          if (updatedStats) {
+            setCurrentStreak(updatedStats.currentStreak || 0);
+            setQazaCount(updatedStats.qazaPrayers || 0);
+            
+            // Update localStorage cache
+            localStorage.setItem('currentStreak', (updatedStats.currentStreak || 0).toString());
+            localStorage.setItem('qazaCount', (updatedStats.qazaPrayers || 0).toString());
+          }
+        } catch (error) {
+          console.warn('Failed to update comprehensive statistics:', error);
+        }
       }
       
       // Check for achievements (prevent duplicates using localStorage)
@@ -218,25 +265,64 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
 
   const togglePrayer = (prayer: PrayerType) => {
     const currentTime = new Date().toISOString();
+    const wasCompleted = todayPrayers[prayer].completed;
     const newPrayers = {
       ...todayPrayers,
       [prayer]: {
-        completed: !todayPrayers[prayer].completed,
-        onTime: !todayPrayers[prayer].completed, // Assume on-time if completed now
-        completedAt: !todayPrayers[prayer].completed ? currentTime : undefined,
+        completed: !wasCompleted,
+        onTime: !wasCompleted, // Assume on-time if completed now
+        completedAt: !wasCompleted ? currentTime : undefined,
       }
     };
     
     setTodayPrayers(newPrayers);
+    
+    // Calculate immediate statistics impact
+    const currentStats = { currentStreak, qazaCount };
+    const realTimeStats = calculateRealTimeStatistics(newPrayers, currentStats);
+    
+    // Update statistics immediately for responsive UI
+    setCurrentStreak(realTimeStats.currentStreak);
+    setQazaCount(realTimeStats.qazaCount);
+    
+    // Save prayers and update comprehensive statistics
     saveTodayPrayers(newPrayers);
     
-    // Show celebration toast
+    // Show appropriate toast
     if (newPrayers[prayer].completed) {
       toast({
         title: "Prayer Completed! ✅",
         description: `${prayer.charAt(0).toUpperCase() + prayer.slice(1)} prayer marked as completed`,
         duration: 2000,
       });
+    } else {
+      toast({
+        title: "Prayer Unmarked ❌",
+        description: `${prayer.charAt(0).toUpperCase() + prayer.slice(1)} prayer unmarked`,
+        duration: 2000,
+      });
+    }
+  };
+
+  // Function to refresh statistics from backend
+  const refreshStatistics = async () => {
+    try {
+      // Refresh user statistics from API
+      const apiStats = await apiService.getUserStats();
+      if (apiStats) {
+        setCurrentStreak(apiStats.currentStreak || 0);
+        setQazaCount(apiStats.qazaPrayers || 0);
+        
+        // Update localStorage cache
+        localStorage.setItem('currentStreak', (apiStats.currentStreak || 0).toString());
+        localStorage.setItem('qazaCount', (apiStats.qazaPrayers || 0).toString());
+      }
+      
+      // Refresh week progress
+      const progress = await calculateWeekProgressFromAPI();
+      setWeekProgress(progress);
+    } catch (error) {
+      console.error('Failed to refresh statistics:', error);
     }
   };
 
@@ -249,6 +335,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         qazaCount,
         togglePrayer,
         isLoading,
+        refreshStatistics,
       }}
     >
       {children}
