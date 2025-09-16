@@ -68,4 +68,4 @@ Preferred communication style: Simple, everyday language.
 - **date-fns**: Date manipulation and formatting for prayer time calculations
 - **clsx + tailwind-merge**: Conditional CSS class composition with Tailwind optimization
 - **zod**: Runtime type validation for API data and form validation
-- **wouter**: Lightweight routing library for single-page application navigation
+- **wouter**: Lightweight routing library for single-page application navigation.
