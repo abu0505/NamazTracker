@@ -1,6 +1,25 @@
-import { Trophy, Star, Medal, Calendar } from 'lucide-react';
+import { Trophy, Star, Medal, Calendar, Flame, Target, CheckCircle, Award, Crown, Zap } from 'lucide-react';
 import { Achievement } from '@shared/schema';
 import { cn } from '@/lib/utils';
+
+// Helper function to convert background color to text color
+function getTextColorFromBg(bgColor: string): string {
+  const colorMap: { [key: string]: string } = {
+    'bg-primary': 'text-primary',
+    'bg-secondary': 'text-secondary',
+    'bg-accent': 'text-accent',
+    'bg-orange-500': 'text-orange-600',
+    'bg-yellow-500': 'text-yellow-600',
+    'bg-green-500': 'text-green-600',
+    'bg-blue-500': 'text-blue-600',
+    'bg-purple-500': 'text-purple-600',
+    'bg-pink-500': 'text-pink-600',
+    'bg-red-500': 'text-red-600',
+    'bg-indigo-500': 'text-indigo-600',
+    'bg-teal-500': 'text-teal-600',
+  };
+  return colorMap[bgColor] || 'text-primary';
+}
 
 interface AchievementCardProps {
   achievement: Achievement;
@@ -8,22 +27,35 @@ interface AchievementCardProps {
 }
 
 const achievementIcons = {
+  perfect_day: CheckCircle,
   perfect_week: Trophy,
-  streak_milestone: Star,
   perfect_month: Medal,
+  streak_milestone: Flame,
+  prayer_milestone: Target,
   consistency: Calendar,
+  early_bird: Star,
+  dedication: Crown,
+  special: Award,
+  seasonal: Zap,
 };
 
-const achievementGradients = [
-  'from-primary to-accent',
-  'from-secondary to-destructive',
-  'from-accent to-primary',
-  'from-destructive to-secondary',
-];
+const achievementGradients = {
+  perfect_day: 'from-green-400 to-green-600',
+  perfect_week: 'from-blue-400 to-blue-600', 
+  perfect_month: 'from-purple-400 to-purple-600',
+  streak_milestone: 'from-orange-400 to-red-500',
+  prayer_milestone: 'from-yellow-400 to-yellow-600',
+  consistency: 'from-teal-400 to-teal-600',
+  early_bird: 'from-pink-400 to-pink-600',
+  dedication: 'from-indigo-400 to-indigo-600',
+  special: 'from-amber-400 to-amber-600',
+  seasonal: 'from-emerald-400 to-emerald-600',
+  default: 'from-primary to-accent'
+};
 
 export function AchievementCard({ achievement, index }: AchievementCardProps) {
   const Icon = achievementIcons[achievement.type as keyof typeof achievementIcons] || Trophy;
-  const gradient = achievementGradients[index % achievementGradients.length];
+  const gradient = achievementGradients[achievement.type as keyof typeof achievementGradients] || achievementGradients.default;
 
   return (
     <div 
@@ -54,14 +86,29 @@ export function AchievementCard({ achievement, index }: AchievementCardProps) {
             <strong>Week:</strong> {achievement.metadata.weekNumber} of {achievement.metadata.year}
           </p>
         )}
+        {achievement.metadata?.streakDays && (
+          <p data-testid={`achievement-streak-${index}`}>
+            <strong>Streak:</strong> {achievement.metadata.streakDays} days
+          </p>
+        )}
+        {achievement.metadata?.totalPrayers && (
+          <p data-testid={`achievement-prayers-${index}`}>
+            <strong>Prayers:</strong> {achievement.metadata.totalPrayers} completed
+          </p>
+        )}
+        {achievement.metadata?.consistencyRate && (
+          <p data-testid={`achievement-consistency-${index}`}>
+            <strong>Rate:</strong> {achievement.metadata.consistencyRate}%
+          </p>
+        )}
         {achievement.metadata?.onTimePrayers !== undefined && (
           <p data-testid={`achievement-ontime-${index}`}>
             <strong>On-time:</strong> {achievement.metadata.onTimePrayers} prayers
           </p>
         )}
-        {achievement.metadata?.qazaPrayers !== undefined && (
-          <p data-testid={`achievement-qaza-${index}`}>
-            <strong>Qaza:</strong> {achievement.metadata.qazaPrayers} prayers
+        {achievement.metadata?.period && (
+          <p data-testid={`achievement-period-${index}`}>
+            <strong>Period:</strong> {achievement.metadata.period}
           </p>
         )}
       </div>
@@ -97,7 +144,7 @@ export function MilestoneProgress({ title, description, current, target, icon: I
         </div>
       </div>
       <div className="text-right">
-        <p className={cn("text-sm font-medium", color.replace('bg-', 'text-'))} data-testid={`milestone-progress-${title.toLowerCase().replace(' ', '-')}`}>
+        <p className={cn("text-sm font-medium", getTextColorFromBg(color))} data-testid={`milestone-progress-${title.toLowerCase().replace(' ', '-')}`}>
           {current}/{target}
         </p>
         <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">

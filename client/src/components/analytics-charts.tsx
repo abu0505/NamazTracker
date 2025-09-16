@@ -12,8 +12,8 @@ import {
   ArcElement,
   BarElement,
 } from 'chart.js';
-import { getWeeklyData, getPrayerAnalytics, getTodayCompletedCount } from '../lib/prayer-utils';
-import { usePrayer } from '../contexts/prayer-context';
+import { useQuery } from '@tanstack/react-query';
+import { getTrendDataForPeriod, getAnalyticsDataForPeriod, getPeriodSummary } from '../lib/prayer-utils';
 import { cn } from '@/lib/utils';
 
 ChartJS.register(
@@ -30,10 +30,6 @@ ChartJS.register(
 
 export function AnalyticsCharts() {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('week');
-  const { todayPrayers } = usePrayer();
-  
-  const weeklyData = getWeeklyData();
-  const prayerAnalytics = getPrayerAnalytics();
 
   const timePeriods = [
     { value: 'week', label: 'Week' },
@@ -41,13 +37,33 @@ export function AnalyticsCharts() {
     { value: 'year', label: 'Year' },
   ];
 
+  // Fetch trend data for the selected period
+  const { data: trendData, isLoading: trendLoading } = useQuery({
+    queryKey: ['/analytics/trend', selectedPeriod],
+    queryFn: () => getTrendDataForPeriod(selectedPeriod),
+  });
+
+  // Fetch analytics data for the selected period
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['/analytics/data', selectedPeriod],
+    queryFn: () => getAnalyticsDataForPeriod(selectedPeriod),
+  });
+
+  // Fetch summary statistics for the selected period
+  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+    queryKey: ['/analytics/summary', selectedPeriod],
+    queryFn: () => getPeriodSummary(selectedPeriod),
+  });
+
+  const isLoading = trendLoading || analyticsLoading || summaryLoading;
+
   // Main trend chart data
   const mainChartData = {
-    labels: weeklyData.map(day => day.day),
+    labels: trendData?.labels || [],
     datasets: [
       {
         label: 'Completed Prayers',
-        data: weeklyData.map(day => day.completed),
+        data: trendData?.dataPoints || [],
         borderColor: 'hsl(158, 70%, 20%)',
         backgroundColor: 'hsla(158, 70%, 20%, 0.1)',
         fill: true,
@@ -85,9 +101,9 @@ export function AnalyticsCharts() {
     labels: ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'],
     datasets: [
       {
-        data: Object.values(prayerAnalytics).map(prayer => 
+        data: analyticsData ? Object.values(analyticsData).map(prayer => 
           prayer.total > 0 ? Math.round((prayer.completed / prayer.total) * 100) : 0
-        ),
+        ) : [0, 0, 0, 0, 0],
         backgroundColor: [
           'hsl(158, 70%, 20%)',
           'hsl(28, 80%, 45%)',
@@ -109,13 +125,13 @@ export function AnalyticsCharts() {
     },
   };
 
-  // Weekly comparison chart data
+  // Period comparison chart data (reuses trend data for consistency)
   const comparisonData = {
-    labels: weeklyData.map(day => day.day),
+    labels: trendData?.labels || [],
     datasets: [
       {
         label: 'Prayers Completed',
-        data: weeklyData.map(day => day.completed),
+        data: trendData?.dataPoints || [],
         backgroundColor: 'hsl(158, 70%, 20%)',
         borderRadius: 8,
       },
@@ -138,11 +154,75 @@ export function AnalyticsCharts() {
     },
   };
 
-  // Calculate statistics
-  const totalPrayers = Object.values(prayerAnalytics).reduce((sum, prayer) => sum + prayer.completed, 0);
-  const totalPossible = Object.values(prayerAnalytics).reduce((sum, prayer) => sum + prayer.total, 0);
-  const successRate = totalPossible > 0 ? Math.round((totalPrayers / totalPossible) * 100) : 0;
-  const totalQaza = totalPossible - totalPrayers;
+  // Statistics from summary data
+  const totalPrayers = summaryData?.totalPrayers || 0;
+  const totalPossible = summaryData?.totalPossible || 0;
+  const successRate = summaryData?.successRate || 0;
+  const totalQaza = summaryData?.qazaPrayers || 0;
+
+  // Dynamic titles based on period
+  const comparisonTitle = selectedPeriod === 'week' 
+    ? 'Weekly Comparison' 
+    : selectedPeriod === 'month' 
+    ? 'Monthly Comparison' 
+    : 'Yearly Comparison';
+
+  const trendTitle = `Prayer Completion Trend (${selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)})`;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Time Period Selector */}
+        <div className="glass-card rounded-2xl p-4">
+          <div className="flex justify-center gap-2">
+            {timePeriods.map((period) => (
+              <button
+                key={period.value}
+                onClick={() => setSelectedPeriod(period.value as any)}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
+                  selectedPeriod === period.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+                data-testid={`period-${period.value}`}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Loading Skeletons */}
+        <div className="glass-card rounded-2xl p-6">
+          <div className="h-6 bg-muted rounded mb-4 w-48 animate-pulse"></div>
+          <div className="h-64 bg-muted rounded animate-pulse"></div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="glass-card rounded-2xl p-6">
+            <div className="h-6 bg-muted rounded mb-4 w-32 animate-pulse"></div>
+            <div className="h-48 bg-muted rounded animate-pulse"></div>
+          </div>
+          <div className="glass-card rounded-2xl p-6">
+            <div className="h-6 bg-muted rounded mb-4 w-32 animate-pulse"></div>
+            <div className="h-48 bg-muted rounded animate-pulse"></div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass-card rounded-2xl p-6 text-center">
+              <div className="h-8 bg-muted rounded mb-4 mx-auto w-8 animate-pulse"></div>
+              <div className="h-6 bg-muted rounded mb-2 w-24 mx-auto animate-pulse"></div>
+              <div className="h-8 bg-muted rounded mb-2 w-16 mx-auto animate-pulse"></div>
+              <div className="h-4 bg-muted rounded w-32 mx-auto animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -170,7 +250,7 @@ export function AnalyticsCharts() {
       {/* Main Chart */}
       <div className="glass-card rounded-2xl p-6">
         <h3 className="text-lg font-semibold mb-4" data-testid="text-prayer-completion-trend">
-          Prayer Completion Trend
+          {trendTitle}
         </h3>
         <div className="h-64">
           <Line data={mainChartData} options={mainChartOptions} />
@@ -190,7 +270,7 @@ export function AnalyticsCharts() {
         
         <div className="glass-card rounded-2xl p-6">
           <h3 className="text-lg font-semibold mb-4" data-testid="text-weekly-comparison">
-            Weekly Comparison
+            {comparisonTitle}
           </h3>
           <div className="h-48">
             <Bar data={comparisonData} options={comparisonOptions} />

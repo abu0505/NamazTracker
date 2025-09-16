@@ -143,22 +143,42 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Check for achievements (prevent duplicates using localStorage)
-      const achievements = checkAchievements(prayers, progress);
       const completedCount = getTodayCompletedCount(prayers);
       
-      achievements.forEach(async (achievement: { title: string; description: string }) => {
+      try {
+        // Load user stats for achievement calculations
+        const userStats = await apiService.getUserStats();
+        const achievements = await checkAchievements(prayers, progress, currentStreak, userStats);
+        
+        achievements.forEach(async (achievement: { type: string; title: string; description: string; metadata?: any }) => {
         // Use different dedup keys: per day for Perfect Day, per week for Perfect Week
         let achievementKey: string;
         let shouldShow = false;
         
-        if (achievement.title === "Perfect Day" && completedCount === 5) {
+        if (achievement.type === "perfect_day" && completedCount === 5) {
           achievementKey = `${achievement.title}-${today}`;
           shouldShow = !localStorage.getItem(achievementKey);
-        } else if (achievement.title === "Perfect Week") {
+        } else if (achievement.type === "perfect_week") {
           // Use week start date for Perfect Week deduplication
           const weekDates = getWeekDates();
           const weekStart = weekDates[0]; // Monday of current week
           achievementKey = `${achievement.title}-${weekStart}`;
+          shouldShow = !localStorage.getItem(achievementKey);
+        } else if (achievement.type === "streak_milestone") {
+          // For streak milestones, use streak days for deduplication
+          achievementKey = `${achievement.type}-${achievement.metadata?.streakDays}`;
+          shouldShow = !localStorage.getItem(achievementKey);
+        } else if (achievement.type === "prayer_milestone") {
+          // For prayer milestones, use total prayer count for deduplication
+          achievementKey = `${achievement.type}-${achievement.metadata?.totalPrayers}`;
+          shouldShow = !localStorage.getItem(achievementKey);
+        } else if (achievement.type === "consistency") {
+          // For consistency achievements, use period and date
+          achievementKey = `${achievement.type}-${achievement.metadata?.period}-${achievement.metadata?.earnedDate}`;
+          shouldShow = !localStorage.getItem(achievementKey);
+        } else {
+          // Generic deduplication for other types
+          achievementKey = `${achievement.type}-${today}`;
           shouldShow = !localStorage.getItem(achievementKey);
         }
         
@@ -168,11 +188,11 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
           // Try to save achievement to API
           try {
             await apiService.createAchievement({
-              type: achievement.title.toLowerCase().replace(' ', '_'),
+              type: achievement.type,
               title: achievement.title,
               description: achievement.description,
               earnedDate: today,
-              metadata: {
+              metadata: achievement.metadata || {
                 onTimePrayers: completedCount,
                 year: new Date().getFullYear(),
               },
@@ -188,6 +208,9 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
           });
         }
       });
+      } catch (error) {
+        console.error('Failed to check achievements:', error);
+      }
     } catch (error) {
       console.error('Failed to save prayers:', error);
     }
