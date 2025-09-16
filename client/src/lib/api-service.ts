@@ -17,11 +17,24 @@ export interface PrayerApiService {
   createAchievement(achievement: Omit<Achievement, 'id' | 'userId' | 'createdAt'>): Promise<Achievement>;
 }
 
+// Helper function to safely parse JSON from response
+function safeJsonParse(response: Response): Promise<any> {
+  // Check if response has content before parsing JSON
+  const contentLength = response.headers.get('content-length');
+  if (contentLength === '0' || response.status === 304 || response.status === 204) {
+    return Promise.resolve(null);
+  }
+  return response.json();
+}
+
 class ApiService implements PrayerApiService {
   async getPrayerRecord(date: string): Promise<PrayerRecord | null> {
     try {
       const response = await fetch(`/api/prayers/${date}`, {
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
       
       if (response.status === 404) {
@@ -32,7 +45,7 @@ class ApiService implements PrayerApiService {
         throw new Error(`Failed to fetch prayer record: ${response.statusText}`);
       }
       
-      return await response.json();
+      return await safeJsonParse(response);
     } catch (error) {
       console.error('Error fetching prayer record:', error);
       return null;
@@ -45,7 +58,7 @@ class ApiService implements PrayerApiService {
       prayers,
     });
     
-    return await response.json();
+    return await safeJsonParse(response);
   }
 
   async getPrayerRecords(startDate?: string, endDate?: string): Promise<PrayerRecord[]> {
@@ -57,13 +70,17 @@ class ApiService implements PrayerApiService {
       const url = `/api/prayers${params.toString() ? '?' + params.toString() : ''}`;
       const response = await fetch(url, {
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch prayer records: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await safeJsonParse(response);
+      return result || [];
     } catch (error) {
       console.error('Error fetching prayer records:', error);
       return [];
@@ -74,13 +91,28 @@ class ApiService implements PrayerApiService {
     try {
       const response = await fetch('/api/stats', {
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch user stats: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await safeJsonParse(response);
+      return result || {
+        id: 'default',
+        userId: 'demo-user',
+        totalPrayers: 0,
+        onTimePrayers: 0,
+        qazaPrayers: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        perfectWeeks: 0,
+        lastStreakUpdate: null,
+        updatedAt: new Date(),
+      };
     } catch (error) {
       console.error('Error fetching user stats:', error);
       // Return default stats if API fails
@@ -101,20 +133,24 @@ class ApiService implements PrayerApiService {
 
   async updateUserStats(updates: Partial<UserStats>): Promise<UserStats> {
     const response = await apiRequest('PATCH', '/api/stats', updates);
-    return await response.json();
+    return await safeJsonParse(response);
   }
 
   async getAchievements(): Promise<Achievement[]> {
     try {
       const response = await fetch('/api/achievements', {
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch achievements: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await safeJsonParse(response);
+      return result || [];
     } catch (error) {
       console.error('Error fetching achievements:', error);
       return [];
@@ -123,7 +159,7 @@ class ApiService implements PrayerApiService {
 
   async createAchievement(achievement: Omit<Achievement, 'id' | 'userId' | 'createdAt'>): Promise<Achievement> {
     const response = await apiRequest('POST', '/api/achievements', achievement);
-    return await response.json();
+    return await safeJsonParse(response);
   }
 }
 

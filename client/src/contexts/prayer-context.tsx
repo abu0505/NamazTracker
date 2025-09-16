@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PrayerType, PrayerStatus } from '@shared/schema';
-import { calculateWeekProgress, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates } from '@/lib/prayer-utils';
+import { calculateWeekProgress, calculateWeekProgressFromAPI, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates } from '@/lib/prayer-utils';
 import { useToast } from '@/hooks/use-toast';
 import { apiService, convertPrayerRecordToDailyPrayers } from '@/lib/api-service';
 
@@ -131,9 +131,16 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to save prayers to API, saved to localStorage only:', error);
       }
       
-      // Update week progress
-      const progress = calculateWeekProgress();
-      setWeekProgress(progress);
+      // Update week progress using backend data for better consistency
+      let progress: number;
+      try {
+        progress = await calculateWeekProgressFromAPI();
+        setWeekProgress(progress);
+      } catch (error) {
+        console.warn('Failed to get week progress from API, falling back to localStorage:', error);
+        progress = calculateWeekProgress();
+        setWeekProgress(progress);
+      }
       
       // Check for achievements (prevent duplicates using localStorage)
       const achievements = checkAchievements(prayers, progress);

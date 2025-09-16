@@ -13,10 +13,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = "demo-user";
       const { date } = req.params;
       
+      // Add cache control headers to prevent 304 responses
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       const record = await storage.getPrayerRecord(userId, date);
       res.json(record || null);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -26,15 +34,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = "demo-user";
       const validatedData = insertPrayerRecordSchema.parse({ ...req.body, userId });
       
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       const record = await storage.updatePrayerRecord(
         validatedData.userId!,
         validatedData.date,
-        validatedData.prayers as any
+        validatedData.prayers
       );
       
       res.json(record);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Validation error';
+      res.status(400).json({ message: errorMessage });
     }
   });
 
@@ -44,15 +60,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = "demo-user";
       const { startDate, endDate } = req.query;
       
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       const records = await storage.getPrayerRecords(
         userId,
-        startDate as string,
-        endDate as string
+        typeof startDate === 'string' ? startDate : undefined,
+        typeof endDate === 'string' ? endDate : undefined
       );
       
       res.json(records);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -60,10 +84,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/achievements", async (req, res) => {
     try {
       const userId = "demo-user";
+      
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       const achievements = await storage.getAchievements(userId);
       res.json(achievements);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -73,10 +106,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = "demo-user";
       const validatedData = insertAchievementSchema.parse({ ...req.body, userId });
       
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       const achievement = await storage.createAchievement(validatedData);
       res.json(achievement);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Validation error';
+      res.status(400).json({ message: errorMessage });
     }
   });
 
@@ -91,9 +132,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stats = await storage.createUserStats({ userId });
       }
       
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       res.json(stats);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -103,10 +152,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = "demo-user";
       const updates = req.body;
       
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       const stats = await storage.updateUserStats(userId, updates);
       res.json(stats);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(400).json({ message: errorMessage });
     }
   });
 
