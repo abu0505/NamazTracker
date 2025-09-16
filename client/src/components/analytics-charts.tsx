@@ -15,6 +15,7 @@ import {
 } from 'chart.js';
 import { useQuery } from '@tanstack/react-query';
 import { getTrendDataForPeriod, getAnalyticsDataForPeriod, getPeriodSummary } from '../lib/prayer-utils';
+import { createAuthAwareQuery } from '../lib/authUtils';
 import { cn } from '@/lib/utils';
 
 ChartJS.register(
@@ -42,19 +43,19 @@ export function AnalyticsCharts() {
   // Fetch trend data for the selected period
   const { data: trendData, isLoading: trendLoading } = useQuery({
     queryKey: ['/analytics/trend', selectedPeriod],
-    queryFn: () => getTrendDataForPeriod(selectedPeriod),
+    queryFn: createAuthAwareQuery(() => getTrendDataForPeriod(selectedPeriod)),
   });
 
   // Fetch analytics data for the selected period
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ['/analytics/data', selectedPeriod],
-    queryFn: () => getAnalyticsDataForPeriod(selectedPeriod),
+    queryFn: createAuthAwareQuery(() => getAnalyticsDataForPeriod(selectedPeriod)),
   });
 
   // Fetch summary statistics for the selected period
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ['/analytics/summary', selectedPeriod],
-    queryFn: () => getPeriodSummary(selectedPeriod),
+    queryFn: createAuthAwareQuery(() => getPeriodSummary(selectedPeriod)),
   });
 
   const isLoading = trendLoading || analyticsLoading || summaryLoading;

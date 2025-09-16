@@ -1,6 +1,7 @@
 import { apiRequest } from './queryClient';
 import { PrayerRecord, Achievement, UserStats } from '@shared/schema';
 import { DailyPrayers } from '../contexts/prayer-context';
+import { handleAuthError } from './authUtils';
 
 export interface PrayerApiService {
   // Prayer records
@@ -42,12 +43,19 @@ class ApiService implements PrayerApiService {
       }
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch prayer record: ${response.statusText}`);
+        const errorMessage = `Failed to fetch prayer record: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
       
       return await safeJsonParse(response);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching prayer record:', error);
+      
+      // Handle auth errors
+      if (handleAuthError(error)) {
+        throw error; // Re-throw for proper error handling upstream
+      }
+      
       return null;
     }
   }
@@ -76,13 +84,20 @@ class ApiService implements PrayerApiService {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch prayer records: ${response.statusText}`);
+        const errorMessage = `Failed to fetch prayer records: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
       
       const result = await safeJsonParse(response);
       return result || [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching prayer records:', error);
+      
+      // Handle auth errors
+      if (handleAuthError(error)) {
+        throw error; // Re-throw for proper error handling upstream
+      }
+      
       return [];
     }
   }
@@ -97,7 +112,8 @@ class ApiService implements PrayerApiService {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch user stats: ${response.statusText}`);
+        const errorMessage = `Failed to fetch user stats: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
       
       const result = await safeJsonParse(response);
@@ -113,8 +129,14 @@ class ApiService implements PrayerApiService {
         lastStreakUpdate: null,
         updatedAt: new Date(),
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching user stats:', error);
+      
+      // Handle auth errors
+      if (handleAuthError(error)) {
+        throw error; // Re-throw for proper error handling upstream
+      }
+      
       // Return default stats if API fails
       return {
         id: 'default',
@@ -146,13 +168,20 @@ class ApiService implements PrayerApiService {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch achievements: ${response.statusText}`);
+        const errorMessage = `Failed to fetch achievements: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
       
       const result = await safeJsonParse(response);
       return result || [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching achievements:', error);
+      
+      // Handle auth errors
+      if (handleAuthError(error)) {
+        throw error; // Re-throw for proper error handling upstream
+      }
+      
       return [];
     }
   }

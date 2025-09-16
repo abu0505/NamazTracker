@@ -7,14 +7,29 @@ import { ThemeProvider } from "next-themes";
 import { PrayerProvider } from "./contexts/prayer-context";
 import { Navigation } from "./components/navigation";
 import { ThemeToggle } from "./components/theme-toggle";
+import { AuthContext, type AuthContextType, useAuthQuery } from "./hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { LogOut, User } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import Dashboard from "./pages/dashboard";
 import Achievements from "./pages/achievements";
 import Analytics from "./pages/analytics";
+import Landing from "./pages/landing";
 import NotFound from "@/pages/not-found";
 
-function Header() {
+function AuthProvider({ children }: { children: React.ReactNode }) {
+  const auth = useAuthQuery();
+  
   return (
-    <header className="glass-nav fixed top-0 left-0 right-0 z-50 px-4 py-3 m-4 rounded-2xl" data-testid="header-main">
+    <AuthContext.Provider value={auth}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function AuthenticatedHeader({ user, logout }: { user: any; logout: () => void }) {
+  return (
+    <header className="glass-nav fixed top-0 left-0 right-0 z-50 px-4 py-3 m-4 rounded-2xl" data-testid="header-authenticated">
       <div className="flex items-center justify-between max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
@@ -24,13 +39,30 @@ function Header() {
             Namaz Tracker
           </h1>
         </div>
-        <ThemeToggle />
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-user-info">
+            <User className="w-4 h-4" />
+            <span>{user?.firstName || user?.email?.split('@')[0] || 'User'}</span>
+          </div>
+          <ThemeToggle />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={logout}
+            className="flex items-center gap-2"
+            data-testid="button-logout"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </Button>
+        </div>
       </div>
     </header>
   );
 }
 
-function Router() {
+function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -41,22 +73,54 @@ function Router() {
   );
 }
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" data-testid="loading-auth">
+      <div className="text-center space-y-4">
+        <div className="w-16 h-16 mx-auto bg-primary rounded-full flex items-center justify-center animate-pulse">
+          <span className="text-primary-foreground text-2xl">🕌</span>
+        </div>
+        <Skeleton className="h-4 w-48 mx-auto" />
+        <Skeleton className="h-4 w-32 mx-auto" />
+      </div>
+    </div>
+  );
+}
+
+function AppContent() {
+  const { user, isLoading, isAuthenticated, logout } = useAuthQuery();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
+  return (
+    <PrayerProvider>
+      <div className="min-h-screen">
+        <AuthenticatedHeader user={user} logout={logout} />
+        <main className="pt-24 pb-24 px-4 max-w-6xl mx-auto">
+          <AuthenticatedRouter />
+        </main>
+        <Navigation />
+      </div>
+    </PrayerProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <PrayerProvider>
+        <AuthProvider>
           <TooltipProvider>
-            <div className="min-h-screen">
-              <Header />
-              <main className="pt-24 pb-24 px-4 max-w-6xl mx-auto">
-                <Router />
-              </main>
-              <Navigation />
-              <Toaster />
-            </div>
+            <AppContent />
+            <Toaster />
           </TooltipProvider>
-        </PrayerProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
