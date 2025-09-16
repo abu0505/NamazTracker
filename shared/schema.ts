@@ -106,6 +106,34 @@ export type Achievement = typeof achievements.$inferSelect;
 export type InsertUserStats = z.infer<typeof insertUserStatsSchema>;
 export type UserStats = typeof userStats.$inferSelect;
 
+// Additional validation schemas for API routes
+export const dateParamSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
+});
+
+export const dateRangeQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format").optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format").optional()
+}).refine(
+  (data) => {
+    if (data.startDate && data.endDate) {
+      return data.startDate <= data.endDate;
+    }
+    return true;
+  },
+  { message: "Start date must be before or equal to end date" }
+);
+
+export const userStatsUpdateSchema = z.object({
+  totalPrayers: z.number().int().min(0).optional(),
+  onTimePrayers: z.number().int().min(0).optional(),
+  qazaPrayers: z.number().int().min(0).optional(),
+  currentStreak: z.number().int().min(0).optional(),
+  bestStreak: z.number().int().min(0).optional(),
+  perfectWeeks: z.number().int().min(0).optional(),
+  lastStreakUpdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").nullable().optional()
+});
+
 export type PrayerType = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 export type PrayerStatus = {
   completed: boolean;

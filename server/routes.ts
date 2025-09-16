@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPrayerRecordSchema, insertAchievementSchema } from "@shared/schema";
+import { insertPrayerRecordSchema, insertAchievementSchema, dateParamSchema, dateRangeQuerySchema, userStatsUpdateSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
@@ -156,7 +156,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/prayers/:date", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { date } = req.params;
+      
+      // Validate date parameter
+      const validatedParams = dateParamSchema.parse(req.params);
+      const { date } = validatedParams;
       
       // Add cache control headers to prevent 304 responses
       res.set({
@@ -168,6 +171,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const record = await storage.getPrayerRecord(userId, date);
       res.json(record || null);
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid date parameter', 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ message: errorMessage });
     }
@@ -197,6 +206,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(record);
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid prayer record data', 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Validation error';
       res.status(400).json({ message: errorMessage });
     }
@@ -206,7 +221,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/prayers", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { startDate, endDate } = req.query;
+      
+      // Validate query parameters
+      const validatedQuery = dateRangeQuerySchema.parse(req.query);
+      const { startDate, endDate } = validatedQuery;
       
       // Add cache control headers
       res.set({
@@ -217,12 +235,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const records = await storage.getPrayerRecords(
         userId,
-        typeof startDate === 'string' ? startDate : undefined,
-        typeof endDate === 'string' ? endDate : undefined
+        startDate,
+        endDate
       );
       
       res.json(records);
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid query parameters', 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ message: errorMessage });
     }
@@ -264,6 +288,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const achievement = await storage.createAchievement(validatedData);
       res.json(achievement);
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid achievement data', 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Validation error';
       res.status(400).json({ message: errorMessage });
     }
@@ -298,7 +328,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const updates = req.body;
+      
+      // Validate request body
+      const validatedUpdates = userStatsUpdateSchema.parse(req.body);
       
       // Add cache control headers
       res.set({
@@ -307,9 +339,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Expires': '0'
       });
       
-      const stats = await storage.updateUserStats(userId, updates);
+      const stats = await storage.updateUserStats(userId, validatedUpdates);
       res.json(stats);
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid user statistics data', 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       res.status(400).json({ message: errorMessage });
     }

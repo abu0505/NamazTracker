@@ -153,8 +153,21 @@ export class MemStorage implements IStorage {
   }
 
   async createAchievement(insertAchievement: InsertAchievement): Promise<Achievement> {
-    const id = randomUUID();
     const userId = insertAchievement.userId || "demo-user"; // Ensure userId is never null
+    
+    // Check for existing achievement with same userId, type, and earnedDate (idempotency)
+    const existingAchievement = Array.from(this.achievements.values()).find(
+      achievement => 
+        achievement.userId === userId &&
+        achievement.type === insertAchievement.type &&
+        achievement.earnedDate === insertAchievement.earnedDate
+    );
+    
+    if (existingAchievement) {
+      return existingAchievement; // Return existing achievement instead of creating duplicate
+    }
+    
+    const id = randomUUID();
     const achievement: Achievement = {
       id,
       userId,
@@ -312,6 +325,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAchievement(achievement: InsertAchievement): Promise<Achievement> {
+    // Check for existing achievement with same userId, type, and earnedDate (idempotency)
+    const [existingAchievement] = await db
+      .select()
+      .from(achievements)
+      .where(and(
+        eq(achievements.userId, achievement.userId!),
+        eq(achievements.type, achievement.type),
+        eq(achievements.earnedDate, achievement.earnedDate)
+      ));
+    
+    if (existingAchievement) {
+      return existingAchievement; // Return existing achievement instead of creating duplicate
+    }
+    
     const [created] = await db
       .insert(achievements)
       .values([achievement as any])
