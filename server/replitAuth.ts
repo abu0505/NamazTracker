@@ -66,6 +66,30 @@ async function upsertUser(
   });
 }
 
+// Keep track of registered strategies
+const registeredStrategies = new Set<string>();
+
+// Helper function to register a strategy dynamically
+async function ensureStrategyRegistered(hostname: string, config: any, verify: VerifyFunction): Promise<void> {
+  const strategyName = `replitauth:${hostname}`;
+  
+  if (!registeredStrategies.has(strategyName)) {
+    console.log(`Registering strategy dynamically for hostname: ${hostname}`);
+    const strategy = new Strategy(
+      {
+        name: strategyName,
+        config,
+        scope: "openid email profile offline_access",
+        callbackURL: `https://${hostname}/api/callback`,
+      },
+      verify,
+    );
+    passport.use(strategy);
+    registeredStrategies.add(strategyName);
+    console.log(`Successfully registered strategy for: ${hostname}`);
+  }
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -84,11 +108,15 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
+  // Register strategies for configured domains
+  const configuredDomains = process.env.REPLIT_DOMAINS!.split(",");
+  console.log("Configured domains:", configuredDomains);
+  
+  for (const domain of configuredDomains) {
+    const strategyName = `replitauth:${domain}`;
     const strategy = new Strategy(
       {
-        name: `replitauth:${domain}`,
+        name: strategyName,
         config,
         scope: "openid email profile offline_access",
         callbackURL: `https://${domain}/api/callback`,
@@ -96,20 +124,34 @@ export async function setupAuth(app: Express) {
       verify,
     );
     passport.use(strategy);
+    registeredStrategies.add(strategyName);
+    console.log(`Registered strategy for domain: ${domain}`);
   }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
+  app.get("/api/login", async (req, res, next) => {
+    console.log(`Login attempt for hostname: ${req.hostname}`);
+    
+    // Ensure strategy is registered for this hostname
+    await ensureStrategyRegistered(req.hostname, config, verify);
+    
+    const strategyName = `replitauth:${req.hostname}`;
+    passport.authenticate(strategyName, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
-  app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
+  app.get("/api/callback", async (req, res, next) => {
+    console.log(`Callback attempt for hostname: ${req.hostname}`);
+    
+    // Ensure strategy is registered for this hostname
+    await ensureStrategyRegistered(req.hostname, config, verify);
+    
+    const strategyName = `replitauth:${req.hostname}`;
+    passport.authenticate(strategyName, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
