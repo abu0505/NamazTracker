@@ -1,11 +1,25 @@
-import { type User, type InsertUser, type PrayerRecord, type InsertPrayerRecord, type Achievement, type InsertAchievement, type UserStats, type InsertUserStats } from "@shared/schema";
+import {
+  users,
+  prayerRecords,
+  achievements,
+  userStats,
+  type User,
+  type UpsertUser,
+  type PrayerRecord,
+  type InsertPrayerRecord,
+  type Achievement,
+  type InsertAchievement,
+  type UserStats,
+  type InsertUserStats,
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // User management
+  // User management (IMPORTANT: these are mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
 
   // Prayer records
   getPrayerRecord(userId: string, date: string): Promise<PrayerRecord | undefined>;
@@ -40,21 +54,33 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const existingUser = this.users.get(userData.id!);
+    if (existingUser) {
+      const updatedUser: User = {
+        ...existingUser,
+        ...userData,
+        updatedAt: new Date(),
+      };
+      this.users.set(userData.id!, updatedUser);
+      return updatedUser;
+    }
+    
+    const user: User = {
+      id: userData.id!,
+      email: userData.email ?? null,
+      firstName: userData.firstName ?? null,
+      lastName: userData.lastName ?? null,
+      profileImageUrl: userData.profileImageUrl ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(user.id, user);
     
     // Initialize user stats
-    const userStats: UserStats = {
+    const userStatsData: UserStats = {
       id: randomUUID(),
-      userId: id,
+      userId: user.id,
       totalPrayers: 0,
       onTimePrayers: 0,
       qazaPrayers: 0,
@@ -64,7 +90,7 @@ export class MemStorage implements IStorage {
       lastStreakUpdate: null,
       updatedAt: new Date(),
     };
-    this.userStats.set(id, userStats);
+    this.userStats.set(user.id, userStatsData);
     
     return user;
   }
@@ -185,4 +211,148 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
+  // User operations (IMPORTANT: these are mandatory for Replit Auth)
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...userData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    
+    // Initialize user stats if it's a new user
+    const existingStats = await this.getUserStats(user.id);
+    if (!existingStats) {
+      await this.createUserStats({ userId: user.id });
+    }
+    
+    return user;
+  }
+
+  // Prayer records
+  async getPrayerRecord(userId: string, date: string): Promise<PrayerRecord | undefined> {
+    const [record] = await db
+      .select()
+      .from(prayerRecords)
+      .where(and(
+        eq(prayerRecords.userId, userId),
+        eq(prayerRecords.date, date)
+      ));
+    return record;
+  }
+
+  async getPrayerRecords(userId: string, startDate?: string, endDate?: string): Promise<PrayerRecord[]> {
+    const conditions = [eq(prayerRecords.userId, userId)];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(prayerRecords.date, startDate),
+        lte(prayerRecords.date, endDate)
+      );
+    }
+    
+    return await db
+      .select()
+      .from(prayerRecords)
+      .where(and(...conditions));
+  }
+
+  async createPrayerRecord(record: InsertPrayerRecord): Promise<PrayerRecord> {
+    const [created] = await db
+      .insert(prayerRecords)
+      .values([record as any])
+      .returning();
+    return created;
+  }
+
+  async updatePrayerRecord(userId: string, date: string, prayers: PrayerRecord["prayers"]): Promise<PrayerRecord> {
+    const existing = await this.getPrayerRecord(userId, date);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(prayerRecords)
+        .set({
+          prayers,
+          updatedAt: new Date(),
+        })
+        .where(eq(prayerRecords.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    return this.createPrayerRecord({ 
+      userId, 
+      date, 
+      prayers: prayers as PrayerRecord["prayers"]
+    });
+  }
+
+  // Achievements
+  async getAchievements(userId: string): Promise<Achievement[]> {
+    return await db
+      .select()
+      .from(achievements)
+      .where(eq(achievements.userId, userId));
+  }
+
+  async createAchievement(achievement: InsertAchievement): Promise<Achievement> {
+    const [created] = await db
+      .insert(achievements)
+      .values([achievement as any])
+      .returning();
+    return created;
+  }
+
+  // User statistics
+  async getUserStats(userId: string): Promise<UserStats | undefined> {
+    const [stats] = await db
+      .select()
+      .from(userStats)
+      .where(eq(userStats.userId, userId));
+    return stats;
+  }
+
+  async createUserStats(stats: InsertUserStats): Promise<UserStats> {
+    const [created] = await db
+      .insert(userStats)
+      .values([stats])
+      .returning();
+    return created;
+  }
+
+  async updateUserStats(userId: string, updates: Partial<UserStats>): Promise<UserStats> {
+    const [updated] = await db
+      .update(userStats)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(userStats.userId, userId))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("User stats not found");
+    }
+    
+    return updated;
+  }
+}
+
+// Use database storage instead of memory storage
+export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new MemStorage();
