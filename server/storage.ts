@@ -88,9 +88,10 @@ export class MemStorage implements IStorage {
 
   async createPrayerRecord(insertRecord: InsertPrayerRecord): Promise<PrayerRecord> {
     const id = randomUUID();
+    const userId = insertRecord.userId || "demo-user"; // Ensure userId is never null
     const record: PrayerRecord = {
       id,
-      userId: insertRecord.userId || null,
+      userId,
       date: insertRecord.date,
       prayers: insertRecord.prayers as PrayerRecord["prayers"],
       createdAt: new Date(),
@@ -127,9 +128,10 @@ export class MemStorage implements IStorage {
 
   async createAchievement(insertAchievement: InsertAchievement): Promise<Achievement> {
     const id = randomUUID();
+    const userId = insertAchievement.userId || "demo-user"; // Ensure userId is never null
     const achievement: Achievement = {
       id,
-      userId: insertAchievement.userId || null,
+      userId,
       type: insertAchievement.type,
       title: insertAchievement.title,
       description: insertAchievement.description,

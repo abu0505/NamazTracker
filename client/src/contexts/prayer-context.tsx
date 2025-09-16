@@ -169,24 +169,19 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         setWeekProgress(progress);
       }
       
-      // Update comprehensive statistics in background
-      if (realTimeStats.shouldUpdateBackend) {
-        try {
-          await updateUserStatisticsInBackend(prayers);
+      // Fetch updated statistics from backend for accuracy (server handles stats update in POST /api/prayers)
+      try {
+        const updatedStats = await apiService.getUserStats();
+        if (updatedStats) {
+          setCurrentStreak(updatedStats.currentStreak || 0);
+          setQazaCount(updatedStats.qazaPrayers || 0);
           
-          // Fetch updated statistics from backend for accuracy
-          const updatedStats = await apiService.getUserStats();
-          if (updatedStats) {
-            setCurrentStreak(updatedStats.currentStreak || 0);
-            setQazaCount(updatedStats.qazaPrayers || 0);
-            
-            // Update localStorage cache
-            localStorage.setItem('currentStreak', (updatedStats.currentStreak || 0).toString());
-            localStorage.setItem('qazaCount', (updatedStats.qazaPrayers || 0).toString());
-          }
-        } catch (error) {
-          console.warn('Failed to update comprehensive statistics:', error);
+          // Update localStorage cache
+          localStorage.setItem('currentStreak', (updatedStats.currentStreak || 0).toString());
+          localStorage.setItem('qazaCount', (updatedStats.qazaPrayers || 0).toString());
         }
+      } catch (error) {
+        console.warn('Failed to fetch updated statistics:', error);
       }
       
       // Check for achievements (prevent duplicates using localStorage)
@@ -195,7 +190,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       try {
         // Load user stats for achievement calculations
         const userStats = await apiService.getUserStats();
-        const achievements = await checkAchievements(prayers, progress, currentStreak, userStats);
+        const achievements = await checkAchievements(prayers, progress, realTimeStats.currentStreak, userStats);
         
         achievements.forEach(async (achievement: { type: string; title: string; description: string; metadata?: any }) => {
         // Use different dedup keys: per day for Perfect Day, per week for Perfect Week
