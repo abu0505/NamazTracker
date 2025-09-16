@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PrayerType, PrayerStatus } from '@shared/schema';
 import { calculateWeekProgress, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates } from '@/lib/prayer-utils';
 import { useToast } from '@/hooks/use-toast';
+import { apiService, convertPrayerRecordToDailyPrayers } from '@/lib/api-service';
 
 export interface DailyPrayers {
   fajr: PrayerStatus;
@@ -44,13 +45,36 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     loadUserStats();
   }, []);
 
-  const loadTodayPrayers = () => {
+  const loadTodayPrayers = async () => {
     try {
       const today = getTodayString();
+      
+      // Try to load from API first
+      const apiRecord = await apiService.getPrayerRecord(today);
+      if (apiRecord) {
+        const apiPrayers = convertPrayerRecordToDailyPrayers(apiRecord);
+        if (apiPrayers) {
+          setTodayPrayers(apiPrayers);
+          // Also save to localStorage for fallback
+          localStorage.setItem(`prayers-${today}`, JSON.stringify(apiPrayers));
+          const progress = calculateWeekProgress();
+          setWeekProgress(progress);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage if API fails or returns null
       const stored = localStorage.getItem(`prayers-${today}`);
       if (stored) {
         const prayers = JSON.parse(stored);
         setTodayPrayers(prayers);
+        // Try to sync to backend if we have localStorage data but no API data
+        try {
+          await apiService.savePrayerRecord(today, prayers);
+        } catch (error) {
+          console.warn('Failed to sync localStorage data to API:', error);
+        }
       }
       
       // Calculate week progress
@@ -63,8 +87,20 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loadUserStats = () => {
+  const loadUserStats = async () => {
     try {
+      // Try to load from API first
+      const apiStats = await apiService.getUserStats();
+      if (apiStats) {
+        setCurrentStreak(apiStats.currentStreak || 0);
+        setQazaCount(apiStats.qazaPrayers || 0);
+        // Save to localStorage for fallback
+        localStorage.setItem('currentStreak', (apiStats.currentStreak || 0).toString());
+        localStorage.setItem('qazaCount', (apiStats.qazaPrayers || 0).toString());
+        return;
+      }
+      
+      // Fallback to localStorage if API fails
       const streak = localStorage.getItem('currentStreak');
       const qaza = localStorage.getItem('qazaCount');
       
@@ -72,13 +108,28 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       if (qaza) setQazaCount(parseInt(qaza));
     } catch (error) {
       console.error('Failed to load user stats:', error);
+      // Fallback to localStorage on error
+      const streak = localStorage.getItem('currentStreak');
+      const qaza = localStorage.getItem('qazaCount');
+      
+      if (streak) setCurrentStreak(parseInt(streak));
+      if (qaza) setQazaCount(parseInt(qaza));
     }
   };
 
-  const saveTodayPrayers = (prayers: DailyPrayers) => {
+  const saveTodayPrayers = async (prayers: DailyPrayers) => {
     try {
       const today = getTodayString();
+      
+      // Save to localStorage immediately for fast UI updates
       localStorage.setItem(`prayers-${today}`, JSON.stringify(prayers));
+      
+      // Try to save to API
+      try {
+        await apiService.savePrayerRecord(today, prayers);
+      } catch (error) {
+        console.warn('Failed to save prayers to API, saved to localStorage only:', error);
+      }
       
       // Update week progress
       const progress = calculateWeekProgress();
@@ -88,7 +139,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       const achievements = checkAchievements(prayers, progress);
       const completedCount = getTodayCompletedCount(prayers);
       
-      achievements.forEach((achievement: { title: string; description: string }) => {
+      achievements.forEach(async (achievement: { title: string; description: string }) => {
         // Use different dedup keys: per day for Perfect Day, per week for Perfect Week
         let achievementKey: string;
         let shouldShow = false;
@@ -106,6 +157,23 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         
         if (shouldShow && achievementKey!) {
           localStorage.setItem(achievementKey, 'true');
+          
+          // Try to save achievement to API
+          try {
+            await apiService.createAchievement({
+              type: achievement.title.toLowerCase().replace(' ', '_'),
+              title: achievement.title,
+              description: achievement.description,
+              earnedDate: today,
+              metadata: {
+                onTimePrayers: completedCount,
+                year: new Date().getFullYear(),
+              },
+            });
+          } catch (error) {
+            console.warn('Failed to save achievement to API:', error);
+          }
+          
           toast({
             title: "Achievement Unlocked! 🏆",
             description: achievement.description,

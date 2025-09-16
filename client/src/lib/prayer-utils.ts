@@ -1,4 +1,5 @@
 import { DailyPrayers } from '../contexts/prayer-context';
+import { apiService, convertPrayerRecordToDailyPrayers } from './api-service';
 
 export const prayerNames = {
   fajr: 'Fajr',
@@ -54,6 +55,36 @@ export function getMonthDates(): string[] {
   }
   
   return monthDates;
+}
+
+export async function calculateWeekProgressFromAPI(): Promise<number> {
+  try {
+    const weekDates = getWeekDates();
+    const startDate = weekDates[0];
+    const endDate = weekDates[weekDates.length - 1];
+    
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    let totalPrayers = 0;
+    let completedPrayers = 0;
+    
+    weekDates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          totalPrayers++;
+          if (prayer.completed) completedPrayers++;
+        });
+      } else {
+        totalPrayers += 5; // 5 prayers per day if no record
+      }
+    });
+    
+    return totalPrayers > 0 ? Math.round((completedPrayers / totalPrayers) * 100) : 0;
+  } catch (error) {
+    console.warn('Failed to calculate week progress from API, falling back to localStorage:', error);
+    return calculateWeekProgress();
+  }
 }
 
 export function calculateWeekProgress(): number {
@@ -125,6 +156,40 @@ export function checkAchievements(prayers: DailyPrayers, weekProgress: number) {
   return achievements;
 }
 
+export async function getWeeklyDataFromAPI() {
+  try {
+    const weekDates = getWeekDates();
+    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const startDate = weekDates[0];
+    const endDate = weekDates[weekDates.length - 1];
+    
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    return weekDates.map((date, index) => {
+      const record = records.find(r => r.date === date);
+      let completed = 0;
+      
+      if (record && record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          completed = getTodayCompletedCount(prayers);
+        }
+      }
+      
+      return {
+        day: weekDays[index],
+        date,
+        completed,
+        total: 5,
+        percentage: Math.round((completed / 5) * 100),
+      };
+    });
+  } catch (error) {
+    console.warn('Failed to get weekly data from API, falling back to localStorage:', error);
+    return getWeeklyData();
+  }
+}
+
 export function getWeeklyData() {
   const weekDates = getWeekDates();
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -146,6 +211,50 @@ export function getWeeklyData() {
       percentage: Math.round((completed / 5) * 100),
     };
   });
+}
+
+export async function getPrayerAnalyticsFromAPI() {
+  try {
+    const monthDates = getMonthDates();
+    const startDate = monthDates[0];
+    const endDate = monthDates[monthDates.length - 1];
+    
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    const prayerStats = {
+      fajr: { completed: 0, total: 0 },
+      dhuhr: { completed: 0, total: 0 },
+      asr: { completed: 0, total: 0 },
+      maghrib: { completed: 0, total: 0 },
+      isha: { completed: 0, total: 0 },
+    };
+    
+    monthDates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          Object.entries(prayers).forEach(([prayerName, prayer]) => {
+            const prayerKey = prayerName as keyof typeof prayerStats;
+            prayerStats[prayerKey].total++;
+            if (prayer.completed) {
+              prayerStats[prayerKey].completed++;
+            }
+          });
+        }
+      } else {
+        // Count missing days as incomplete
+        Object.keys(prayerStats).forEach(prayer => {
+          prayerStats[prayer as keyof typeof prayerStats].total++;
+        });
+      }
+    });
+    
+    return prayerStats;
+  } catch (error) {
+    console.warn('Failed to get prayer analytics from API, falling back to localStorage:', error);
+    return getPrayerAnalytics();
+  }
 }
 
 export function getPrayerAnalytics() {

@@ -14,7 +14,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.params;
       
       const record = await storage.getPrayerRecord(userId, date);
-      res.json(record);
+      res.json(record || null);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -29,7 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const record = await storage.updatePrayerRecord(
         validatedData.userId!,
         validatedData.date,
-        validatedData.prayers
+        validatedData.prayers as any
       );
       
       res.json(record);

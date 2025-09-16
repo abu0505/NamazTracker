@@ -92,7 +92,7 @@ export class MemStorage implements IStorage {
       id,
       userId: insertRecord.userId || null,
       date: insertRecord.date,
-      prayers: insertRecord.prayers,
+      prayers: insertRecord.prayers as PrayerRecord["prayers"],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -101,7 +101,7 @@ export class MemStorage implements IStorage {
     return record;
   }
 
-  async updatePrayerRecord(userId: string, date: string, prayers: any): Promise<PrayerRecord> {
+  async updatePrayerRecord(userId: string, date: string, prayers: PrayerRecord["prayers"]): Promise<PrayerRecord> {
     const key = `${userId}-${date}`;
     const existing = this.prayerRecords.get(key);
     
@@ -134,7 +134,7 @@ export class MemStorage implements IStorage {
       title: insertAchievement.title,
       description: insertAchievement.description,
       earnedDate: insertAchievement.earnedDate,
-      metadata: insertAchievement.metadata || null,
+      metadata: insertAchievement.metadata as Achievement["metadata"] || null,
       createdAt: new Date(),
     };
     
