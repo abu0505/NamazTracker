@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PrayerType, PrayerStatus } from '@shared/schema';
-import { calculateWeekProgress, getTodayString, checkAchievements } from '@/lib/prayer-utils';
+import { calculateWeekProgress, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates } from '@/lib/prayer-utils';
 import { useToast } from '@/hooks/use-toast';
 
 export interface DailyPrayers {
@@ -84,14 +84,34 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       const progress = calculateWeekProgress();
       setWeekProgress(progress);
       
-      // Check for achievements
+      // Check for achievements (prevent duplicates using localStorage)
       const achievements = checkAchievements(prayers, progress);
+      const completedCount = getTodayCompletedCount(prayers);
+      
       achievements.forEach((achievement: { title: string; description: string }) => {
-        toast({
-          title: "Achievement Unlocked! 🏆",
-          description: achievement.description,
-          duration: 5000,
-        });
+        // Use different dedup keys: per day for Perfect Day, per week for Perfect Week
+        let achievementKey: string;
+        let shouldShow = false;
+        
+        if (achievement.title === "Perfect Day" && completedCount === 5) {
+          achievementKey = `${achievement.title}-${today}`;
+          shouldShow = !localStorage.getItem(achievementKey);
+        } else if (achievement.title === "Perfect Week") {
+          // Use week start date for Perfect Week deduplication
+          const weekDates = getWeekDates();
+          const weekStart = weekDates[0]; // Monday of current week
+          achievementKey = `${achievement.title}-${weekStart}`;
+          shouldShow = !localStorage.getItem(achievementKey);
+        }
+        
+        if (shouldShow && achievementKey!) {
+          localStorage.setItem(achievementKey, 'true');
+          toast({
+            title: "Achievement Unlocked! 🏆",
+            description: achievement.description,
+            duration: 5000,
+          });
+        }
       });
     } catch (error) {
       console.error('Failed to save prayers:', error);

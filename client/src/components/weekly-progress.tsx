@@ -96,6 +96,7 @@ export function WeeklyProgress() {
 }
 
 export function WeeklyOverview() {
+  const { todayPrayers } = usePrayer(); // Add context to trigger re-renders
   const weeklyData = getWeeklyData();
 
   const getStatusColor = (percentage: number) => {
