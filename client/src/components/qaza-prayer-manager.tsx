@@ -102,9 +102,13 @@ export function QazaPrayerManager() {
       queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats/yearly-qaza'] });
-      queryClient.invalidateQueries({ queryKey: ['/analytics/trend'] });
-      queryClient.invalidateQueries({ queryKey: ['/analytics/summary'] });
-      queryClient.invalidateQueries({ queryKey: ['/analytics/data'] });
+      
+      // Invalidate analytics queries for all periods to ensure real-time sync
+      ['week', 'month', 'year'].forEach(period => {
+        queryClient.invalidateQueries({ queryKey: ['/analytics/trend', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/data', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/summary', period] });
+      });
       
       // Update original prayers to reflect saved state
       setOriginalPrayers(editedPrayers);
@@ -139,9 +143,13 @@ export function QazaPrayerManager() {
       queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats/yearly-qaza'] });
-      queryClient.invalidateQueries({ queryKey: ['/analytics/trend'] });
-      queryClient.invalidateQueries({ queryKey: ['/analytics/summary'] });
-      queryClient.invalidateQueries({ queryKey: ['/analytics/data'] });
+      
+      // Invalidate analytics queries for all periods to ensure real-time sync
+      ['week', 'month', 'year'].forEach(period => {
+        queryClient.invalidateQueries({ queryKey: ['/analytics/trend', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/data', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/summary', period] });
+      });
       
       // Reset weekly selections
       setSelectedWeeks(new Set());

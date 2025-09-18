@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { PrayerType, PrayerStatus } from '@shared/schema';
 import { calculateWeekProgress, calculateWeekProgressFromAPI, getTodayString, checkAchievements, getTodayCompletedCount, getWeekDates, calculateCurrentStreakFromAPI, calculateQazaCountFromAPI, calculateRealTimeStatistics, updateUserStatisticsInBackend } from '@/lib/prayer-utils';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +40,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [qazaCount, setQazaCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Load today's prayers from localStorage on mount
   useEffect(() => {
@@ -184,6 +186,18 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to fetch updated statistics:', error);
       }
       
+      // Invalidate React Query cache for real-time sync with analytics and other components
+      queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/yearly-qaza'] });
+      
+      // Invalidate analytics queries for all periods to ensure real-time sync
+      ['week', 'month', 'year'].forEach(period => {
+        queryClient.invalidateQueries({ queryKey: ['/analytics/trend', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/data', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/summary', period] });
+      });
+      
       // Check for achievements (prevent duplicates using localStorage)
       const completedCount = getTodayCompletedCount(prayers);
       
@@ -302,6 +316,18 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   // Function to refresh statistics from backend
   const refreshStatistics = async () => {
     try {
+      // Invalidate React Query cache to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/yearly-qaza'] });
+      
+      // Invalidate analytics queries for all periods
+      ['week', 'month', 'year'].forEach(period => {
+        queryClient.invalidateQueries({ queryKey: ['/analytics/trend', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/data', period] });
+        queryClient.invalidateQueries({ queryKey: ['/analytics/summary', period] });
+      });
+      
       // Refresh user statistics from API
       const apiStats = await apiService.getUserStats();
       if (apiStats) {
