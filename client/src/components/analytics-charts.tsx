@@ -16,6 +16,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { getTrendDataForPeriod, getAnalyticsDataForPeriod, getPeriodSummary } from '../lib/prayer-utils';
 import { createAuthAwareQuery } from '../lib/authUtils';
+import { apiService } from '../lib/api-service';
 import { cn } from '@/lib/utils';
 
 ChartJS.register(
@@ -58,7 +59,13 @@ export function AnalyticsCharts() {
     queryFn: createAuthAwareQuery(() => getPeriodSummary(selectedPeriod)),
   });
 
-  const isLoading = trendLoading || analyticsLoading || summaryLoading;
+  // Fetch yearly Qaza statistics (independent of selected period)
+  const { data: yearlyQazaData, isLoading: yearlyQazaLoading } = useQuery({
+    queryKey: ['/api/stats/yearly-qaza'],
+    queryFn: createAuthAwareQuery(() => apiService.getYearlyQazaStats()),
+  });
+
+  const isLoading = trendLoading || analyticsLoading || summaryLoading || yearlyQazaLoading;
 
   // Main trend chart data
   const mainChartData = {
@@ -213,8 +220,8 @@ export function AnalyticsCharts() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="glass-card rounded-2xl p-6 text-center">
               <div className="h-8 bg-muted rounded mb-4 mx-auto w-8 animate-pulse"></div>
               <div className="h-6 bg-muted rounded mb-2 w-24 mx-auto animate-pulse"></div>
@@ -282,7 +289,7 @@ export function AnalyticsCharts() {
       </div>
 
       {/* Statistics Summary */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="glass-card rounded-2xl p-6 text-center">
           <div className="text-3xl mb-3">🤲</div>
           <h4 className="text-lg font-semibold mb-2" data-testid="text-total-prayers-title">
@@ -314,6 +321,29 @@ export function AnalyticsCharts() {
             {totalQaza}
           </p>
           <p className="text-sm text-muted-foreground">Need to be completed</p>
+        </div>
+        
+        <div className="glass-card rounded-2xl p-6 text-center">
+          <div className="text-3xl mb-3">📅</div>
+          <h4 className="text-lg font-semibold mb-2" data-testid="text-yearly-qaza-title">
+            Remaining Qaza {yearlyQazaData?.currentYear || new Date().getFullYear()}
+          </h4>
+          <p className="text-2xl font-bold text-orange-600" data-testid="text-yearly-qaza-remaining">
+            {yearlyQazaData?.qazaRemaining || 0}
+          </p>
+          <div className="space-y-1 mt-2">
+            <p className="text-sm text-muted-foreground" data-testid="text-yearly-total-possible">
+              {yearlyQazaData?.totalPossible || 0} total possible
+            </p>
+            <p className="text-sm text-muted-foreground" data-testid="text-yearly-completed">
+              {yearlyQazaData?.completed || 0} completed
+            </p>
+            <p className="text-xs text-muted-foreground" data-testid="text-yearly-completion-percentage">
+              {yearlyQazaData && yearlyQazaData.totalPossible > 0 
+                ? Math.round((yearlyQazaData.completed / yearlyQazaData.totalPossible) * 100)
+                : 0}% completion rate
+            </p>
+          </div>
         </div>
       </div>
     </div>

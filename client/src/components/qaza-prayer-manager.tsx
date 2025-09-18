@@ -101,6 +101,7 @@ export function QazaPrayerManager() {
       // Invalidate and refetch relevant queries for cache consistency
       queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/yearly-qaza'] });
       queryClient.invalidateQueries({ queryKey: ['/analytics/trend'] });
       queryClient.invalidateQueries({ queryKey: ['/analytics/summary'] });
       queryClient.invalidateQueries({ queryKey: ['/analytics/data'] });
@@ -137,6 +138,7 @@ export function QazaPrayerManager() {
       // Invalidate and refetch relevant queries for cache consistency
       queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/yearly-qaza'] });
       queryClient.invalidateQueries({ queryKey: ['/analytics/trend'] });
       queryClient.invalidateQueries({ queryKey: ['/analytics/summary'] });
       queryClient.invalidateQueries({ queryKey: ['/analytics/data'] });
