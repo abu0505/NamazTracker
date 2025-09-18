@@ -105,8 +105,8 @@
       0 8px 32px rgba(0, 0, 0, 0.15),
       inset 0 1px 0 rgba(255, 255, 255, 0.8),
       inset 0 -1px 0 rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(9px) saturate(180%);
-    -webkit-backdrop-filter: blur(9px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     position: relative;
     overflow: hidden;
   }
@@ -126,26 +126,6 @@
     z-index: -1;
   }
 
-  .glass-nav::after {
-    content: '';
-    position: absolute;
-    top: 20%;
-    left: 15%;
-    right: 15%;
-    bottom: 20%;
-    background: 
-      radial-gradient(ellipse 60% 40% at 30% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
-      radial-gradient(ellipse 50% 35% at 70% 50%, rgba(255, 255, 255, 0.25) 0%, transparent 50%),
-      linear-gradient(90deg, transparent 48%, rgba(255, 255, 255, 0.6) 49%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0.6) 51%, transparent 52%);
-    opacity: 0.7;
-    filter: blur(0.5px);
-    pointer-events: none;
-    z-index: 1;
-    border-radius: inherit;
-    mask: radial-gradient(ellipse 80% 60% at center, black 30%, transparent 70%);
-    -webkit-mask: radial-gradient(ellipse 80% 60% at center, black 30%, transparent 70%);
-  }
-
   .dark .glass-nav {
     background: rgba(15, 23, 42, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -160,14 +140,6 @@
       rgba(255, 255, 255, 0.15) 0%,
       rgba(255, 255, 255, 0.05) 50%,
       rgba(255, 255, 255, 0.1) 100%);
-  }
-
-  .dark .glass-nav::after {
-    background: 
-      radial-gradient(ellipse 60% 40% at 30% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
-      radial-gradient(ellipse 50% 35% at 70% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
-      linear-gradient(90deg, transparent 48%, rgba(255, 255, 255, 0.4) 49%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0.4) 51%, transparent 52%);
-    opacity: 0.6;
   }
 
   .prayer-checkbox {
