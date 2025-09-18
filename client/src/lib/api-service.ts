@@ -8,6 +8,7 @@ export interface PrayerApiService {
   getPrayerRecord(date: string): Promise<PrayerRecord | null>;
   savePrayerRecord(date: string, prayers: DailyPrayers): Promise<PrayerRecord>;
   getPrayerRecords(startDate?: string, endDate?: string): Promise<PrayerRecord[]>;
+  batchUpdatePrayerRecords(updates: Array<{ date: string; prayers: DailyPrayers }>): Promise<PrayerRecord[]>;
 
   // User statistics  
   getUserStats(): Promise<UserStats>;
@@ -100,6 +101,22 @@ class ApiService implements PrayerApiService {
       }
       
       return [];
+    }
+  }
+
+  async batchUpdatePrayerRecords(updates: Array<{ date: string; prayers: DailyPrayers }>): Promise<PrayerRecord[]> {
+    try {
+      const response = await apiRequest('POST', '/api/prayers/batch', { updates });
+      return await safeJsonParse(response);
+    } catch (error: any) {
+      console.error('Error in batch update prayer records:', error);
+      
+      // Handle auth errors
+      if (handleAuthError(error)) {
+        throw error; // Re-throw for proper error handling upstream
+      }
+      
+      throw error; // Re-throw for caller to handle
     }
   }
 

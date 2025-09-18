@@ -29,6 +29,165 @@ export function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+// Weekly utilities for the weekly checkbox feature
+
+/**
+ * Get the start of week (Monday) for a given date
+ */
+export function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Get the end of week (Sunday) for a given date
+ */
+export function getWeekEnd(date: Date): Date {
+  const weekStart = getWeekStart(date);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  return weekEnd;
+}
+
+/**
+ * Get all dates in a week (Monday to Sunday) as string array
+ */
+export function getWeekDatesArray(date: Date): string[] {
+  const weekStart = getWeekStart(date);
+  const dates: string[] = [];
+  
+  for (let i = 0; i < 7; i++) {
+    const currentDate = new Date(weekStart);
+    currentDate.setDate(weekStart.getDate() + i);
+    dates.push(currentDate.toISOString().split('T')[0]);
+  }
+  
+  return dates;
+}
+
+/**
+ * Generate past weeks for selection (only past weeks, not future)
+ * Returns an array of week objects with start/end dates and date arrays
+ */
+export function getPastWeeks(numberOfWeeks: number = 12): Array<{
+  startDate: string;
+  endDate: string;
+  dates: string[];
+  weekLabel: string;
+}> {
+  const today = new Date();
+  const weeks: Array<{
+    startDate: string;
+    endDate: string;
+    dates: string[];
+    weekLabel: string;
+  }> = [];
+  
+  // Start from current week and go back
+  for (let i = 0; i < numberOfWeeks; i++) {
+    const weekDate = new Date(today);
+    weekDate.setDate(today.getDate() - (i * 7));
+    
+    const weekStart = getWeekStart(weekDate);
+    const weekEnd = getWeekEnd(weekDate);
+    
+    // Only include weeks that are in the past or current
+    if (weekEnd <= today) {
+      const dates = getWeekDatesArray(weekDate);
+      const weekLabel = formatWeekLabel(weekStart, weekEnd);
+      
+      weeks.push({
+        startDate: weekStart.toISOString().split('T')[0],
+        endDate: weekEnd.toISOString().split('T')[0],
+        dates,
+        weekLabel,
+      });
+    }
+  }
+  
+  return weeks.reverse(); // Return in chronological order (oldest first)
+}
+
+/**
+ * Format week label for display (e.g., "Dec 9-15, 2024")
+ */
+export function formatWeekLabel(startDate: Date, endDate: Date): string {
+  const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+  const startDay = startDate.getDate();
+  const endDay = endDate.getDate();
+  const year = endDate.getFullYear();
+  
+  if (startMonth === endMonth) {
+    return `${startMonth} ${startDay}-${endDay}, ${year}`;
+  } else {
+    return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+  }
+}
+
+/**
+ * Calculate week completion percentage based on prayer records
+ */
+export async function calculateWeekCompletion(dates: string[]): Promise<{
+  completionPercentage: number;
+  completedPrayers: number;
+  totalPrayers: number;
+  status: 'empty' | 'partial' | 'complete';
+}> {
+  try {
+    const records = await apiService.getPrayerRecords(dates[0], dates[dates.length - 1]);
+    
+    let completedPrayers = 0;
+    let totalPrayers = dates.length * 5; // 5 prayers per day
+    
+    dates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          if (prayer.completed) {
+            completedPrayers++;
+          }
+        });
+      }
+    });
+    
+    const completionPercentage = totalPrayers > 0 ? Math.round((completedPrayers / totalPrayers) * 100) : 0;
+    
+    let status: 'empty' | 'partial' | 'complete' = 'empty';
+    if (completionPercentage === 100) {
+      status = 'complete';
+    } else if (completionPercentage > 0) {
+      status = 'partial';
+    }
+    
+    return {
+      completionPercentage,
+      completedPrayers,
+      totalPrayers,
+      status,
+    };
+  } catch (error) {
+    console.error('Error calculating week completion:', error);
+    return {
+      completionPercentage: 0,
+      completedPrayers: 0,
+      totalPrayers: dates.length * 5,
+      status: 'empty',
+    };
+  }
+}
+
+/**
+ * Check if a week is in the future (should not be selectable)
+ */
+export function isWeekInFuture(weekEndDate: string): boolean {
+  const today = new Date();
+  const weekEnd = new Date(weekEndDate);
+  return weekEnd > today;
+}
+
 export function getWeekDates(): string[] {
   const today = new Date();
   const monday = new Date(today);

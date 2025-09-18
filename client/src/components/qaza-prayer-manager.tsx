@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Save, X, Sun, Cloud, Star } from 'lucide-react';
+import { Calendar as CalendarIcon, Save, X, Sun, Cloud, Star, Clock } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiService, convertPrayerRecordToDailyPrayers } from '@/lib/api-service';
-import { prayerNames } from '@/lib/prayer-utils';
+import { prayerNames, getPastWeeks, calculateWeekCompletion, isWeekInFuture } from '@/lib/prayer-utils';
 import { PrayerType, PrayerRecord } from '@shared/schema';
 import { DailyPrayers } from '@/contexts/prayer-context';
 import { apiRequest } from '@/lib/queryClient';
@@ -40,11 +42,37 @@ const defaultPrayers: DailyPrayers = {
 };
 
 export function QazaPrayerManager() {
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
+  
+  // Daily view state
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [editedPrayers, setEditedPrayers] = useState<DailyPrayers>(defaultPrayers);
   const [originalPrayers, setOriginalPrayers] = useState<DailyPrayers>(defaultPrayers);
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // Weekly view state
+  const [selectedWeeks, setSelectedWeeks] = useState<Set<string>>(new Set());
+  const [isMarkingAsCompleted, setIsMarkingAsCompleted] = useState(true);
+  const [weeklyHasChanges, setWeeklyHasChanges] = useState(false);
+  const [pastWeeks, setPastWeeks] = useState<Array<{
+    startDate: string;
+    endDate: string;
+    dates: string[];
+    weekLabel: string;
+  }>>([]);
+  
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmationDetails, setConfirmationDetails] = useState<{
+    weekCount: number;
+    dateCount: number;
+    prayerCount: number;
+    action: 'completed' | 'missed';
+    dateRange: { start: string; end: string };
+  } | null>(null);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -58,7 +86,7 @@ export function QazaPrayerManager() {
     staleTime: 0, // Always refetch to get latest data
   });
 
-  // Save prayer changes mutation
+  // Save prayer changes mutation (daily)
   const savePrayersMutation = useMutation({
     mutationFn: async (data: { date: string; prayers: DailyPrayers }) => {
       const response = await apiRequest('POST', '/api/prayers', data);
@@ -91,6 +119,42 @@ export function QazaPrayerManager() {
     },
   });
 
+  // Batch update mutation (weekly)
+  const batchUpdateMutation = useMutation({
+    mutationFn: async (updates: Array<{ date: string; prayers: DailyPrayers }>) => {
+      return await apiService.batchUpdatePrayerRecords(updates);
+    },
+    onSuccess: (data, variables) => {
+      const weekCount = selectedWeeks.size;
+      const prayerCount = variables.length;
+      const action = isMarkingAsCompleted ? 'completed' : 'missed';
+      
+      toast({
+        title: "Batch Update Successful! ✅",
+        description: `${weekCount} week(s) with ${prayerCount} prayer records marked as ${action}.`,
+      });
+      
+      // Invalidate and refetch relevant queries for cache consistency
+      queryClient.invalidateQueries({ queryKey: ['/api/prayers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/analytics/trend'] });
+      queryClient.invalidateQueries({ queryKey: ['/analytics/summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/analytics/data'] });
+      
+      // Reset weekly selections
+      setSelectedWeeks(new Set());
+      setWeeklyHasChanges(false);
+    },
+    onError: (error) => {
+      console.error('Failed to batch update prayer records:', error);
+      toast({
+        title: "Batch Update Failed ❌",
+        description: "Failed to update prayer records. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Update prayers when data is fetched
   useEffect(() => {
     if (prayerRecord) {
@@ -108,6 +172,12 @@ export function QazaPrayerManager() {
     }
   }, [prayerRecord, selectedDateString]);
 
+  // Load past weeks when component mounts
+  useEffect(() => {
+    const weeks = getPastWeeks(12); // Get last 12 weeks
+    setPastWeeks(weeks);
+  }, []);
+
   // Check if prayers have changed from original
   useEffect(() => {
     const changed = Object.keys(editedPrayers).some(prayer => {
@@ -116,6 +186,11 @@ export function QazaPrayerManager() {
     });
     setHasChanges(changed);
   }, [editedPrayers, originalPrayers]);
+
+  // Check if weekly selections have changed
+  useEffect(() => {
+    setWeeklyHasChanges(selectedWeeks.size > 0);
+  }, [selectedWeeks]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date && date <= new Date()) {
@@ -150,6 +225,97 @@ export function QazaPrayerManager() {
     setHasChanges(false);
   };
 
+  // Weekly handlers
+  const toggleWeekSelection = (weekKey: string) => {
+    const newSelected = new Set(selectedWeeks);
+    if (newSelected.has(weekKey)) {
+      newSelected.delete(weekKey);
+    } else {
+      newSelected.add(weekKey);
+    }
+    setSelectedWeeks(newSelected);
+  };
+
+  const selectAllWeeks = () => {
+    const allWeekKeys = pastWeeks.map(week => `${week.startDate}-${week.endDate}`);
+    setSelectedWeeks(new Set(allWeekKeys));
+  };
+
+  const clearWeekSelection = () => {
+    setSelectedWeeks(new Set());
+  };
+
+  const handleBatchUpdate = () => {
+    if (selectedWeeks.size === 0) return;
+
+    // Calculate batch update details
+    const updates: Array<{ date: string; prayers: DailyPrayers }> = [];
+    let earliestDate: string | null = null;
+    let latestDate: string | null = null;
+    
+    selectedWeeks.forEach(weekKey => {
+      const week = pastWeeks.find(w => `${w.startDate}-${w.endDate}` === weekKey);
+      if (week) {
+        week.dates.forEach(date => {
+          if (!earliestDate || date < earliestDate) earliestDate = date;
+          if (!latestDate || date > latestDate) latestDate = date;
+          
+          const prayers: DailyPrayers = {
+            fajr: { completed: isMarkingAsCompleted, onTime: false },
+            dhuhr: { completed: isMarkingAsCompleted, onTime: false },
+            asr: { completed: isMarkingAsCompleted, onTime: false },
+            maghrib: { completed: isMarkingAsCompleted, onTime: false },
+            isha: { completed: isMarkingAsCompleted, onTime: false },
+          };
+          updates.push({ date, prayers });
+        });
+      }
+    });
+
+    // Set confirmation details and show dialog
+    setConfirmationDetails({
+      weekCount: selectedWeeks.size,
+      dateCount: updates.length,
+      prayerCount: updates.length * 5, // 5 prayers per day
+      action: isMarkingAsCompleted ? 'completed' : 'missed',
+      dateRange: { 
+        start: earliestDate || '', 
+        end: latestDate || '' 
+      }
+    });
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmBatchUpdate = async () => {
+    if (selectedWeeks.size === 0) return;
+
+    const updates: Array<{ date: string; prayers: DailyPrayers }> = [];
+    
+    selectedWeeks.forEach(weekKey => {
+      const week = pastWeeks.find(w => `${w.startDate}-${w.endDate}` === weekKey);
+      if (week) {
+        week.dates.forEach(date => {
+          const prayers: DailyPrayers = {
+            fajr: { completed: isMarkingAsCompleted, onTime: false },
+            dhuhr: { completed: isMarkingAsCompleted, onTime: false },
+            asr: { completed: isMarkingAsCompleted, onTime: false },
+            maghrib: { completed: isMarkingAsCompleted, onTime: false },
+            isha: { completed: isMarkingAsCompleted, onTime: false },
+          };
+          updates.push({ date, prayers });
+        });
+      }
+    });
+
+    setShowConfirmDialog(false);
+    batchUpdateMutation.mutate(updates);
+  };
+
+  const handleWeeklyCancelChanges = () => {
+    setSelectedWeeks(new Set());
+    setWeeklyHasChanges(false);
+  };
+
   const isPastDate = (date: Date) => date < new Date(new Date().setHours(0, 0, 0, 0));
 
   return (
@@ -159,9 +325,24 @@ export function QazaPrayerManager() {
           Qaza Prayer Management
         </h2>
         <p className="text-muted-foreground" data-testid="text-qaza-description">
-          Select a past date to view and edit prayer records
+          Manage your missed prayers individually by date or in bulk by week
         </p>
       </div>
+
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "daily" | "weekly")} className="w-full">
+        <TabsList className="grid w-full grid-cols-2" data-testid="tabs-view-selector">
+          <TabsTrigger value="daily" data-testid="tab-daily">
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            Daily View
+          </TabsTrigger>
+          <TabsTrigger value="weekly" data-testid="tab-weekly">
+            <Clock className="mr-2 h-4 w-4" />
+            Weekly View
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Daily View */}
+        <TabsContent value="daily" className="space-y-6" data-testid="content-daily-view">
 
       {/* Date Picker */}
       <div className="flex justify-center">
@@ -289,14 +470,302 @@ export function QazaPrayerManager() {
         </div>
       )}
 
-      {!selectedDate && (
-        <div className="text-center py-12">
-          <CalendarIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground text-lg" data-testid="text-no-date-selected">
-            Select a date to manage prayer records
-          </p>
-        </div>
+          {!selectedDate && (
+            <div className="text-center py-12">
+              <CalendarIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-lg" data-testid="text-no-date-selected">
+                Select a date to manage prayer records
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Weekly View */}
+        <TabsContent value="weekly" className="space-y-6" data-testid="content-weekly-view">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold mb-2" data-testid="text-weekly-title">
+              Bulk Prayer Management
+            </h3>
+            <p className="text-muted-foreground text-sm" data-testid="text-weekly-description">
+              Select weeks to mark all prayers as completed or missed
+            </p>
+          </div>
+
+          {/* Mark as Completed/Missed Toggle */}
+          <div className="flex justify-center gap-4">
+            <Button
+              variant={isMarkingAsCompleted ? "default" : "outline"}
+              onClick={() => setIsMarkingAsCompleted(true)}
+              data-testid="button-mark-completed"
+            >
+              Mark as Completed
+            </Button>
+            <Button
+              variant={!isMarkingAsCompleted ? "default" : "outline"}
+              onClick={() => setIsMarkingAsCompleted(false)}
+              data-testid="button-mark-missed"
+            >
+              Mark as Missed
+            </Button>
+          </div>
+
+          {/* Week Selection Controls */}
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={selectAllWeeks}
+                disabled={pastWeeks.length === 0}
+                data-testid="button-select-all-weeks"
+              >
+                Select All
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearWeekSelection}
+                disabled={selectedWeeks.size === 0}
+                data-testid="button-clear-selection"
+              >
+                Clear Selection
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground" data-testid="text-selected-count">
+              {selectedWeeks.size} week(s) selected
+            </p>
+          </div>
+
+          {/* Past Weeks List */}
+          <div className="space-y-3 max-h-96 overflow-y-auto" data-testid="list-past-weeks">
+            {pastWeeks.length === 0 ? (
+              <div className="text-center py-8">
+                <Clock className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-lg" data-testid="text-no-weeks-available">
+                  No past weeks available for selection
+                </p>
+              </div>
+            ) : (
+              pastWeeks.map((week) => {
+                const weekKey = `${week.startDate}-${week.endDate}`;
+                const isSelected = selectedWeeks.has(weekKey);
+                
+                return (
+                  <WeekRow
+                    key={weekKey}
+                    week={week}
+                    isSelected={isSelected}
+                    onToggle={() => toggleWeekSelection(weekKey)}
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          {weeklyHasChanges && (
+            <div className="flex justify-center gap-3 pt-4">
+              <Button
+                onClick={handleWeeklyCancelChanges}
+                variant="outline"
+                disabled={batchUpdateMutation.isPending}
+                className="min-w-[100px]"
+                data-testid="button-weekly-cancel"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBatchUpdate}
+                disabled={selectedWeeks.size === 0 || batchUpdateMutation.isPending}
+                className="min-w-[140px]"
+                data-testid="button-weekly-save"
+              >
+                {batchUpdateMutation.isPending ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {batchUpdateMutation.isPending 
+                  ? 'Processing...' 
+                  : `Mark Selected Weeks`
+                }
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent data-testid="dialog-batch-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="text-confirmation-title">
+              Confirm Batch Update
+            </AlertDialogTitle>
+            <AlertDialogDescription data-testid="text-confirmation-description">
+              {confirmationDetails && (
+                <div className="space-y-3">
+                  <p className="text-destructive font-medium">
+                    ⚠️ This action will overwrite any existing prayer records for the selected dates
+                  </p>
+                  <div className="bg-muted/30 p-4 rounded-lg space-y-2">
+                    <p>
+                      <strong>Action:</strong> Mark as{" "}
+                      <span className={cn(
+                        "font-semibold",
+                        confirmationDetails.action === 'completed' ? "text-green-600" : "text-orange-600"
+                      )}>
+                        {confirmationDetails.action}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Affected weeks:</strong> {confirmationDetails.weekCount} week(s)
+                    </p>
+                    <p>
+                      <strong>Date range:</strong> {confirmationDetails.dateRange.start} to {confirmationDetails.dateRange.end}
+                    </p>
+                    <p>
+                      <strong>Total prayers:</strong> {confirmationDetails.prayerCount} prayers across {confirmationDetails.dateCount} days
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This cannot be undone. All individual daily prayer settings for these dates will be replaced.
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setShowConfirmDialog(false)}
+              data-testid="button-confirmation-cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmBatchUpdate}
+              disabled={batchUpdateMutation.isPending}
+              data-testid="button-confirmation-proceed"
+              className={cn(
+                confirmationDetails?.action === 'completed' 
+                  ? "bg-green-600 hover:bg-green-700" 
+                  : "bg-orange-600 hover:bg-orange-700"
+              )}
+            >
+              {batchUpdateMutation.isPending ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Processing...
+                </div>
+              ) : (
+                `Yes, Mark as ${confirmationDetails?.action || 'completed'}`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// Week Row Component for displaying individual weeks
+function WeekRow({ 
+  week, 
+  isSelected, 
+  onToggle 
+}: { 
+  week: { startDate: string; endDate: string; dates: string[]; weekLabel: string }; 
+  isSelected: boolean; 
+  onToggle: () => void; 
+}) {
+  const [completion, setCompletion] = useState<{
+    completionPercentage: number;
+    status: 'empty' | 'partial' | 'complete';
+  }>({ completionPercentage: 0, status: 'empty' });
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Check if this week is in the future and should be disabled
+  const isDisabled = isWeekInFuture(week.endDate);
+
+  useEffect(() => {
+    const fetchCompletion = async () => {
+      setIsLoading(true);
+      try {
+        const result = await calculateWeekCompletion(week.dates);
+        setCompletion({
+          completionPercentage: result.completionPercentage,
+          status: result.status,
+        });
+      } catch (error) {
+        console.error('Error fetching week completion:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCompletion();
+  }, [week.dates]);
+
+  const getStatusIndicator = () => {
+    if (isLoading) {
+      return <div className="w-3 h-3 rounded-full bg-muted animate-pulse"></div>;
+    }
+    
+    switch (completion.status) {
+      case 'complete':
+        return <div className="w-3 h-3 rounded-full bg-green-500"></div>;
+      case 'partial':
+        return <div className="w-3 h-3 rounded-full bg-yellow-500"></div>;
+      case 'empty':
+        return <div className="w-3 h-3 rounded-full bg-red-500"></div>;
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between p-4 rounded-xl transition-all duration-300",
+        isDisabled 
+          ? "opacity-50 cursor-not-allowed bg-muted/20" 
+          : "hover:bg-muted/50 cursor-pointer",
+        isSelected && !isDisabled ? "bg-primary/10 border border-primary/20" : "bg-muted/30"
       )}
+      onClick={isDisabled ? undefined : onToggle}
+      data-testid={`week-row-${week.startDate}`}
+    >
+      <div className="flex items-center gap-4">
+        <Checkbox
+          checked={isSelected && !isDisabled}
+          onCheckedChange={isDisabled ? undefined : onToggle}
+          disabled={isDisabled}
+          className="h-5 w-5"
+          data-testid={`checkbox-week-${week.startDate}`}
+        />
+        <div className="flex items-center gap-3">
+          {getStatusIndicator()}
+          <div>
+            <h4 className={cn(
+              "font-medium",
+              isDisabled ? "text-muted-foreground" : "text-foreground"
+            )} data-testid={`text-week-label-${week.startDate}`}>
+              {week.weekLabel}
+              {isDisabled && <span className="ml-2 text-xs">(Future)</span>}
+            </h4>
+            <p className="text-sm text-muted-foreground" data-testid={`text-week-completion-${week.startDate}`}>
+              {isDisabled 
+                ? 'Not available (future week)'
+                : isLoading 
+                  ? 'Loading...' 
+                  : `${completion.completionPercentage}% completed`
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="text-sm text-muted-foreground">
+        {week.dates.length} days
+      </div>
     </div>
   );
 }
