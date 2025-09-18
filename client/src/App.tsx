@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Dashboard from "./pages/dashboard";
+import Qaza from "./pages/qaza";
 import Achievements from "./pages/achievements";
 import Analytics from "./pages/analytics";
 import Landing from "./pages/landing";
@@ -66,6 +67,7 @@ function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/qaza" component={Qaza} />
       <Route path="/achievements" component={Achievements} />
       <Route path="/analytics" component={Analytics} />
       <Route component={NotFound} />

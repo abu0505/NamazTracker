@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'wouter';
-import { Home, Trophy, BarChart3 } from 'lucide-react';
+import { Home, Trophy, BarChart3, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
+  { path: '/qaza', icon: Calendar, label: 'Qaza' },
   { path: '/achievements', icon: Trophy, label: 'Achievements' },
   { path: '/analytics', icon: BarChart3, label: 'Analytics' },
 ];
