@@ -29,7 +29,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedHeader({ user, logout }: { user: any; logout: () => void }) {
   return (
-    <header className="glass-nav fixed top-0 left-0 right-0 z-50 px-4 py-3 m-4 rounded-2xl" data-testid="header-authenticated">
+    <header className="glass-nav px-4 py-3 m-4 rounded-2xl" data-testid="header-authenticated">
       <div className="flex items-center justify-between max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
@@ -102,7 +102,7 @@ function AppContent() {
     <PrayerProvider>
       <div className="min-h-screen">
         <AuthenticatedHeader user={user} logout={logout} />
-        <main className="pt-24 pb-24 px-4 max-w-6xl mx-auto">
+        <main className="pb-24 px-4 max-w-6xl mx-auto">
           <AuthenticatedRouter />
         </main>
         <Navigation />
