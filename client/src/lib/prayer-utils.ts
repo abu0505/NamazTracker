@@ -1107,3 +1107,140 @@ export function calculateRealTimeStatistics(newPrayers: DailyPrayers, currentSta
     shouldUpdateBackend: true, // Always update backend for accuracy
   };
 }
+
+// Calculate how many Qaza prayers remain for the current year
+export async function getYearlyQazaRemaining(): Promise<number> {
+  try {
+    const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const currentDate = new Date();
+    
+    // Calculate total days from start of year to today (inclusive)
+    const daysSinceStartOfYear = Math.floor((currentDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // Total possible prayers for the year so far (5 prayers per day)
+    const totalPossible = daysSinceStartOfYear * 5;
+    
+    // Get year dates up to today
+    const yearDates = getYearDates().filter(date => date <= getTodayString());
+    const startDate = yearDates[0];
+    const endDate = yearDates[yearDates.length - 1];
+    
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    let completedPrayers = 0;
+    
+    yearDates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          if (prayer.completed) completedPrayers++;
+        });
+      }
+    });
+    
+    // Qaza prayers = Total possible - Completed prayers
+    return Math.max(0, totalPossible - completedPrayers);
+  } catch (error) {
+    console.error('Failed to get yearly Qaza remaining from API, falling back to localStorage:', error);
+    
+    // Fallback to localStorage
+    const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const daysSinceStartOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const totalPossible = daysSinceStartOfYear * 5;
+    
+    const yearDates = getYearDates().filter(date => date <= getTodayString());
+    let completedPrayers = 0;
+    
+    yearDates.forEach(date => {
+      const stored = localStorage.getItem(`prayers-${date}`);
+      if (stored) {
+        const prayers: DailyPrayers = JSON.parse(stored);
+        Object.values(prayers).forEach(prayer => {
+          if (prayer.completed) completedPrayers++;
+        });
+      }
+    });
+    
+    return Math.max(0, totalPossible - completedPrayers);
+  }
+}
+
+// Get comprehensive yearly statistics including total possible prayers, completed, and remaining
+export async function getYearlyQazaStats(): Promise<{
+  totalPossible: number;
+  completed: number;
+  qazaRemaining: number;
+  currentYear: number;
+}> {
+  try {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    
+    // Calculate total days from start of year to today (inclusive)
+    const daysSinceStartOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // Total possible prayers for the year so far (5 prayers per day)
+    const totalPossible = daysSinceStartOfYear * 5;
+    
+    // Get year dates up to today
+    const yearDates = getYearDates().filter(date => date <= getTodayString());
+    const startDate = yearDates[0];
+    const endDate = yearDates[yearDates.length - 1];
+    
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    let completed = 0;
+    
+    yearDates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          if (prayer.completed) completed++;
+        });
+      }
+    });
+    
+    const qazaRemaining = Math.max(0, totalPossible - completed);
+    
+    return {
+      totalPossible,
+      completed,
+      qazaRemaining,
+      currentYear
+    };
+  } catch (error) {
+    console.error('Failed to get yearly Qaza stats from API, falling back to localStorage:', error);
+    
+    // Fallback to localStorage
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const daysSinceStartOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const totalPossible = daysSinceStartOfYear * 5;
+    
+    const yearDates = getYearDates().filter(date => date <= getTodayString());
+    let completed = 0;
+    
+    yearDates.forEach(date => {
+      const stored = localStorage.getItem(`prayers-${date}`);
+      if (stored) {
+        const prayers: DailyPrayers = JSON.parse(stored);
+        Object.values(prayers).forEach(prayer => {
+          if (prayer.completed) completed++;
+        });
+      }
+    });
+    
+    const qazaRemaining = Math.max(0, totalPossible - completed);
+    
+    return {
+      totalPossible,
+      completed,
+      qazaRemaining,
+      currentYear
+    };
+  }
+}

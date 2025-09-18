@@ -12,6 +12,7 @@ export interface PrayerApiService {
   // User statistics  
   getUserStats(): Promise<UserStats>;
   updateUserStats(updates: Partial<UserStats>): Promise<UserStats>;
+  getYearlyQazaStats(): Promise<{ totalPossible: number; completed: number; qazaRemaining: number; currentYear: number }>;
 
   // Achievements
   getAchievements(): Promise<Achievement[]>;
@@ -156,6 +157,45 @@ class ApiService implements PrayerApiService {
   async updateUserStats(updates: Partial<UserStats>): Promise<UserStats> {
     const response = await apiRequest('PATCH', '/api/stats', updates);
     return await safeJsonParse(response);
+  }
+
+  async getYearlyQazaStats(): Promise<{ totalPossible: number; completed: number; qazaRemaining: number; currentYear: number }> {
+    try {
+      const response = await fetch('/api/stats/yearly-qaza', {
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorMessage = `Failed to fetch yearly Qaza stats: ${response.statusText}`;
+        throw new Error(errorMessage);
+      }
+      
+      const result = await safeJsonParse(response);
+      return result || {
+        totalPossible: 0,
+        completed: 0,
+        qazaRemaining: 0,
+        currentYear: new Date().getFullYear()
+      };
+    } catch (error: any) {
+      console.error('Error fetching yearly Qaza stats:', error);
+      
+      // Handle auth errors
+      if (handleAuthError(error)) {
+        throw error; // Re-throw for proper error handling upstream
+      }
+      
+      // Return default stats if API fails
+      return {
+        totalPossible: 0,
+        completed: 0,
+        qazaRemaining: 0,
+        currentYear: new Date().getFullYear()
+      };
+    }
   }
 
   async getAchievements(): Promise<Achievement[]> {

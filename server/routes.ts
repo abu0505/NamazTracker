@@ -387,6 +387,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get yearly Qaza statistics
+  app.get("/api/stats/yearly-qaza", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      // Calculate yearly Qaza statistics
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const startOfYear = new Date(currentYear, 0, 1);
+      
+      // Calculate total days from start of year to today (inclusive)
+      const daysSinceStartOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Total possible prayers for the year so far (5 prayers per day)
+      const totalPossible = daysSinceStartOfYear * 5;
+      
+      // Get year dates up to today
+      const yearDates: string[] = [];
+      for (let d = new Date(startOfYear); d <= today; d.setDate(d.getDate() + 1)) {
+        yearDates.push(d.toISOString().split('T')[0]);
+      }
+      
+      const startDate = yearDates[0];
+      const endDate = yearDates[yearDates.length - 1];
+      
+      const records = await storage.getPrayerRecords(userId, startDate, endDate);
+      
+      let completed = 0;
+      
+      yearDates.forEach(date => {
+        const record = records.find(r => r.date === date);
+        if (record && record.prayers) {
+          Object.values(record.prayers).forEach(prayer => {
+            if (prayer.completed) completed++;
+          });
+        }
+      });
+      
+      const qazaRemaining = Math.max(0, totalPossible - completed);
+      
+      const response = {
+        totalPossible,
+        completed,
+        qazaRemaining,
+        currentYear
+      };
+      
+      res.json(response);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error calculating yearly Qaza stats:', error);
+      res.status(500).json({ message: errorMessage });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
