@@ -20,7 +20,7 @@ export function Navigation() {
               className={cn(
                 "flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all duration-300 relative",
                 location === item.path
-                  ? "bg-primary/20 text-primary-foreground backdrop-blur-md border border-primary/30 shadow-lg shadow-primary/20"
+                  ? "bg-primary/20 text-black dark:text-primary-foreground backdrop-blur-md border border-primary/30 shadow-lg shadow-primary/20"
                   : "text-muted-foreground hover:bg-white/10 hover:backdrop-blur-sm hover:border hover:border-white/20 dark:hover:bg-white/5"
               )}
               data-testid={`nav-${item.label.toLowerCase()}`}
