@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Calendar, Trophy, BarChart3, Clock, Zap, Star } from 'lucide-react';
 
 export default function Landing() {
@@ -21,13 +22,16 @@ export default function Landing() {
               Namaz Tracker
             </h1>
           </div>
-          <Button 
-            onClick={handleLogin}
-            className="bg-primary hover:bg-primary/90"
-            data-testid="button-login-header"
-          >
-            Sign In
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button 
+              onClick={handleLogin}
+              className="bg-primary hover:bg-primary/90"
+              data-testid="button-login-header"
+            >
+              Sign In
+            </Button>
+          </div>
         </div>
       </header>
 
