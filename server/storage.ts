@@ -11,6 +11,8 @@ import {
   type InsertAchievement,
   type UserStats,
   type InsertUserStats,
+  type DailyPrayers,
+  type BatchUpdatePrayers,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte } from "drizzle-orm";
@@ -26,6 +28,7 @@ export interface IStorage {
   getPrayerRecords(userId: string, startDate?: string, endDate?: string): Promise<PrayerRecord[]>;
   createPrayerRecord(record: InsertPrayerRecord): Promise<PrayerRecord>;
   updatePrayerRecord(userId: string, date: string, prayers: any): Promise<PrayerRecord>;
+  batchUpdatePrayerRecords(userId: string, updates: Array<{ date: string; prayers: DailyPrayers }>): Promise<PrayerRecord[]>;
 
   // Achievements
   getAchievements(userId: string): Promise<Achievement[]>;
@@ -144,6 +147,17 @@ export class MemStorage implements IStorage {
     
     // Create new record if it doesn't exist
     return this.createPrayerRecord({ userId, date, prayers });
+  }
+
+  async batchUpdatePrayerRecords(userId: string, updates: Array<{ date: string; prayers: DailyPrayers }>): Promise<PrayerRecord[]> {
+    const updatedRecords: PrayerRecord[] = [];
+    
+    for (const update of updates) {
+      const record = await this.updatePrayerRecord(userId, update.date, update.prayers as PrayerRecord["prayers"]);
+      updatedRecords.push(record);
+    }
+    
+    return updatedRecords;
   }
 
   async getAchievements(userId: string): Promise<Achievement[]> {
@@ -314,6 +328,18 @@ export class DatabaseStorage implements IStorage {
       date, 
       prayers: prayers as PrayerRecord["prayers"]
     });
+  }
+
+  async batchUpdatePrayerRecords(userId: string, updates: Array<{ date: string; prayers: DailyPrayers }>): Promise<PrayerRecord[]> {
+    const updatedRecords: PrayerRecord[] = [];
+    
+    // Process updates sequentially to maintain data consistency
+    for (const update of updates) {
+      const record = await this.updatePrayerRecord(userId, update.date, update.prayers as PrayerRecord["prayers"]);
+      updatedRecords.push(record);
+    }
+    
+    return updatedRecords;
   }
 
   // Achievements

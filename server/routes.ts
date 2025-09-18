@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPrayerRecordSchema, insertAchievementSchema, dateParamSchema, dateRangeQuerySchema, userStatsUpdateSchema } from "@shared/schema";
+import { insertPrayerRecordSchema, insertAchievementSchema, dateParamSchema, dateRangeQuerySchema, userStatsUpdateSchema, batchUpdatePrayersSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
@@ -209,6 +209,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           message: 'Invalid prayer record data', 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Validation error';
+      res.status(400).json({ message: errorMessage });
+    }
+  });
+
+  // Batch update prayer records
+  app.post("/api/prayers/batch", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Validate batch update request
+      const validatedData = batchUpdatePrayersSchema.parse(req.body);
+      
+      // Add cache control headers
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      // Perform batch update
+      const updatedRecords = await storage.batchUpdatePrayerRecords(userId, validatedData.updates);
+      
+      // Automatically update user statistics after batch update
+      await updateUserStatistics(userId);
+      
+      res.json(updatedRecords);
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid batch update data', 
           errors: error.errors.map(e => e.message) 
         });
       }

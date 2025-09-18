@@ -140,3 +140,37 @@ export type PrayerStatus = {
   onTime: boolean;
   completedAt?: string;
 };
+
+export type DailyPrayers = {
+  fajr: { completed: boolean; onTime: boolean; completedAt?: string };
+  dhuhr: { completed: boolean; onTime: boolean; completedAt?: string };
+  asr: { completed: boolean; onTime: boolean; completedAt?: string };
+  maghrib: { completed: boolean; onTime: boolean; completedAt?: string };
+  isha: { completed: boolean; onTime: boolean; completedAt?: string };
+};
+
+// Schema for individual prayer status
+const prayerStatusSchema = z.object({
+  completed: z.boolean(),
+  onTime: z.boolean(),
+  completedAt: z.string().optional(),
+});
+
+// Schema for daily prayers object
+const dailyPrayersSchema = z.object({
+  fajr: prayerStatusSchema,
+  dhuhr: prayerStatusSchema,
+  asr: prayerStatusSchema,
+  maghrib: prayerStatusSchema,
+  isha: prayerStatusSchema,
+});
+
+// Schema for batch update request
+export const batchUpdatePrayersSchema = z.object({
+  updates: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+    prayers: dailyPrayersSchema,
+  })).min(1, "At least one update is required").max(7, "Maximum 7 updates per batch"),
+});
+
+export type BatchUpdatePrayers = z.infer<typeof batchUpdatePrayersSchema>;
