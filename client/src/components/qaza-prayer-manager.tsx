@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiService, convertPrayerRecordToDailyPrayers } from '@/lib/api-service';
-import { prayerNames, getPastWeeks, calculateWeekCompletion, isWeekInFuture } from '@/lib/prayer-utils';
+import { prayerNames, getPastWeeks, getWeeksFromJanuary, getPastMonthsFromJanuary, calculateWeekCompletion, calculateMonthCompletion, isWeekInFuture } from '@/lib/prayer-utils';
 import { PrayerType, PrayerRecord } from '@shared/schema';
 import { DailyPrayers } from '@/contexts/prayer-context';
 import { apiRequest } from '@/lib/queryClient';
@@ -43,7 +43,7 @@ const defaultPrayers: DailyPrayers = {
 
 export function QazaPrayerManager() {
   // Tab state
-  const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
+  const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">("daily");
   
   // Daily view state
   const [selectedDate, setSelectedDate] = useState<Date>();
@@ -61,6 +61,19 @@ export function QazaPrayerManager() {
     endDate: string;
     dates: string[];
     weekLabel: string;
+  }>>([]);
+  
+  // Monthly view state
+  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
+  const [isMonthMarkingAsCompleted, setIsMonthMarkingAsCompleted] = useState(true);
+  const [monthlyHasChanges, setMonthlyHasChanges] = useState(false);
+  const [pastMonths, setPastMonths] = useState<Array<{
+    startDate: string;
+    endDate: string;
+    dates: string[];
+    monthLabel: string;
+    monthName: string;
+    year: number;
   }>>([]);
   
   // Confirmation dialog state
@@ -182,10 +195,13 @@ export function QazaPrayerManager() {
     }
   }, [prayerRecord, selectedDateString]);
 
-  // Load past weeks when component mounts
+  // Load past weeks and months when component mounts
   useEffect(() => {
-    const weeks = getPastWeeks(12); // Get last 12 weeks
+    const weeks = getWeeksFromJanuary(); // Get weeks from January 1st to current
     setPastWeeks(weeks);
+    
+    const months = getPastMonthsFromJanuary(); // Get months from January to current (excluding current)
+    setPastMonths(months);
   }, []);
 
   // Check if prayers have changed from original
@@ -201,6 +217,11 @@ export function QazaPrayerManager() {
   useEffect(() => {
     setWeeklyHasChanges(selectedWeeks.size > 0);
   }, [selectedWeeks]);
+  
+  // Check if monthly selections have changed
+  useEffect(() => {
+    setMonthlyHasChanges(selectedMonths.size > 0);
+  }, [selectedMonths]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date && date <= new Date()) {
@@ -297,25 +318,47 @@ export function QazaPrayerManager() {
   };
 
   const handleConfirmBatchUpdate = async () => {
-    if (selectedWeeks.size === 0) return;
+    if (selectedWeeks.size === 0 && selectedMonths.size === 0) return;
 
     const updates: Array<{ date: string; prayers: DailyPrayers }> = [];
     
-    selectedWeeks.forEach(weekKey => {
-      const week = pastWeeks.find(w => `${w.startDate}-${w.endDate}` === weekKey);
-      if (week) {
-        week.dates.forEach(date => {
-          const prayers: DailyPrayers = {
-            fajr: { completed: isMarkingAsCompleted, onTime: false },
-            dhuhr: { completed: isMarkingAsCompleted, onTime: false },
-            asr: { completed: isMarkingAsCompleted, onTime: false },
-            maghrib: { completed: isMarkingAsCompleted, onTime: false },
-            isha: { completed: isMarkingAsCompleted, onTime: false },
-          };
-          updates.push({ date, prayers });
-        });
-      }
-    });
+    // Handle weekly updates
+    if (selectedWeeks.size > 0) {
+      selectedWeeks.forEach(weekKey => {
+        const week = pastWeeks.find(w => `${w.startDate}-${w.endDate}` === weekKey);
+        if (week) {
+          week.dates.forEach(date => {
+            const prayers: DailyPrayers = {
+              fajr: { completed: isMarkingAsCompleted, onTime: false },
+              dhuhr: { completed: isMarkingAsCompleted, onTime: false },
+              asr: { completed: isMarkingAsCompleted, onTime: false },
+              maghrib: { completed: isMarkingAsCompleted, onTime: false },
+              isha: { completed: isMarkingAsCompleted, onTime: false },
+            };
+            updates.push({ date, prayers });
+          });
+        }
+      });
+    }
+    
+    // Handle monthly updates
+    if (selectedMonths.size > 0) {
+      selectedMonths.forEach(monthKey => {
+        const month = pastMonths.find(m => `${m.monthName}-${m.year}` === monthKey);
+        if (month) {
+          month.dates.forEach(date => {
+            const prayers: DailyPrayers = {
+              fajr: { completed: isMonthMarkingAsCompleted, onTime: false },
+              dhuhr: { completed: isMonthMarkingAsCompleted, onTime: false },
+              asr: { completed: isMonthMarkingAsCompleted, onTime: false },
+              maghrib: { completed: isMonthMarkingAsCompleted, onTime: false },
+              isha: { completed: isMonthMarkingAsCompleted, onTime: false },
+            };
+            updates.push({ date, prayers });
+          });
+        }
+      });
+    }
 
     setShowConfirmDialog(false);
     batchUpdateMutation.mutate(updates);
@@ -324,6 +367,72 @@ export function QazaPrayerManager() {
   const handleWeeklyCancelChanges = () => {
     setSelectedWeeks(new Set());
     setWeeklyHasChanges(false);
+  };
+
+  // Monthly handlers
+  const toggleMonthSelection = (monthKey: string) => {
+    const newSelected = new Set(selectedMonths);
+    if (newSelected.has(monthKey)) {
+      newSelected.delete(monthKey);
+    } else {
+      newSelected.add(monthKey);
+    }
+    setSelectedMonths(newSelected);
+  };
+
+  const selectAllMonths = () => {
+    const allMonthKeys = pastMonths.map(month => `${month.monthName}-${month.year}`);
+    setSelectedMonths(new Set(allMonthKeys));
+  };
+
+  const clearMonthSelection = () => {
+    setSelectedMonths(new Set());
+  };
+
+  const handleMonthlyBatchUpdate = () => {
+    if (selectedMonths.size === 0) return;
+
+    // Calculate batch update details for months
+    const updates: Array<{ date: string; prayers: DailyPrayers }> = [];
+    let earliestDate: string | null = null;
+    let latestDate: string | null = null;
+    
+    selectedMonths.forEach(monthKey => {
+      const month = pastMonths.find(m => `${m.monthName}-${m.year}` === monthKey);
+      if (month) {
+        month.dates.forEach(date => {
+          if (!earliestDate || date < earliestDate) earliestDate = date;
+          if (!latestDate || date > latestDate) latestDate = date;
+          
+          const prayers: DailyPrayers = {
+            fajr: { completed: isMonthMarkingAsCompleted, onTime: false },
+            dhuhr: { completed: isMonthMarkingAsCompleted, onTime: false },
+            asr: { completed: isMonthMarkingAsCompleted, onTime: false },
+            maghrib: { completed: isMonthMarkingAsCompleted, onTime: false },
+            isha: { completed: isMonthMarkingAsCompleted, onTime: false },
+          };
+          updates.push({ date, prayers });
+        });
+      }
+    });
+
+    // Set confirmation details and show dialog
+    setConfirmationDetails({
+      weekCount: selectedMonths.size,
+      dateCount: updates.length,
+      prayerCount: updates.length * 5, // 5 prayers per day
+      action: isMonthMarkingAsCompleted ? 'completed' : 'missed',
+      dateRange: { 
+        start: earliestDate || '', 
+        end: latestDate || '' 
+      }
+    });
+    setShowConfirmDialog(true);
+  };
+
+  const handleMonthlyCancelChanges = () => {
+    setSelectedMonths(new Set());
+    setMonthlyHasChanges(false);
   };
 
   const isPastDate = (date: Date) => date < new Date(new Date().setHours(0, 0, 0, 0));
@@ -339,8 +448,8 @@ export function QazaPrayerManager() {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "daily" | "weekly")} className="w-full">
-        <TabsList className="grid w-full grid-cols-2" data-testid="tabs-view-selector">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "daily" | "weekly" | "monthly")} className="w-full">
+        <TabsList className="grid w-full grid-cols-3" data-testid="tabs-view-selector">
           <TabsTrigger value="daily" data-testid="tab-daily">
             <CalendarIcon className="mr-2 h-4 w-4" />
             Daily View
@@ -348,6 +457,10 @@ export function QazaPrayerManager() {
           <TabsTrigger value="weekly" data-testid="tab-weekly">
             <Clock className="mr-2 h-4 w-4" />
             Weekly View
+          </TabsTrigger>
+          <TabsTrigger value="monthly" data-testid="tab-monthly">
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            Monthly View
           </TabsTrigger>
         </TabsList>
 
@@ -604,6 +717,121 @@ export function QazaPrayerManager() {
             </div>
           )}
         </TabsContent>
+
+        {/* Monthly View */}
+        <TabsContent value="monthly" className="space-y-6" data-testid="content-monthly-view">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold mb-2" data-testid="text-monthly-title">
+              Monthly Prayer Management
+            </h3>
+            <p className="text-muted-foreground text-sm" data-testid="text-monthly-description">
+              Select months to mark all prayers as completed or missed
+            </p>
+          </div>
+
+          {/* Mark as Completed/Missed Toggle */}
+          <div className="flex justify-center gap-4">
+            <Button
+              variant={isMonthMarkingAsCompleted ? "default" : "outline"}
+              onClick={() => setIsMonthMarkingAsCompleted(true)}
+              data-testid="button-monthly-mark-completed"
+            >
+              Mark as Completed
+            </Button>
+            <Button
+              variant={!isMonthMarkingAsCompleted ? "default" : "outline"}
+              onClick={() => setIsMonthMarkingAsCompleted(false)}
+              data-testid="button-monthly-mark-missed"
+            >
+              Mark as Missed
+            </Button>
+          </div>
+
+          {/* Month Selection Controls */}
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={selectAllMonths}
+                disabled={pastMonths.length === 0}
+                data-testid="button-select-all-months"
+              >
+                Select All
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearMonthSelection}
+                disabled={selectedMonths.size === 0}
+                data-testid="button-clear-monthly-selection"
+              >
+                Clear Selection
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground" data-testid="text-monthly-selected-count">
+              {selectedMonths.size} month(s) selected
+            </p>
+          </div>
+
+          {/* Past Months List */}
+          <div className="space-y-3 max-h-96 overflow-y-auto" data-testid="list-past-months">
+            {pastMonths.length === 0 ? (
+              <div className="text-center py-8">
+                <CalendarIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-lg" data-testid="text-no-months-available">
+                  No past months available for selection
+                </p>
+              </div>
+            ) : (
+              pastMonths.map((month) => {
+                const monthKey = `${month.monthName}-${month.year}`;
+                const isSelected = selectedMonths.has(monthKey);
+                
+                return (
+                  <MonthRow
+                    key={monthKey}
+                    month={month}
+                    isSelected={isSelected}
+                    onToggle={() => toggleMonthSelection(monthKey)}
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          {monthlyHasChanges && (
+            <div className="flex justify-center gap-3 pt-4">
+              <Button
+                onClick={handleMonthlyCancelChanges}
+                variant="outline"
+                disabled={batchUpdateMutation.isPending}
+                className="min-w-[100px]"
+                data-testid="button-monthly-cancel"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                onClick={handleMonthlyBatchUpdate}
+                disabled={selectedMonths.size === 0 || batchUpdateMutation.isPending}
+                className="min-w-[140px]"
+                data-testid="button-monthly-save"
+              >
+                {batchUpdateMutation.isPending ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {batchUpdateMutation.isPending 
+                  ? 'Processing...' 
+                  : `Mark Selected Months`
+                }
+              </Button>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* Confirmation Dialog */}
@@ -775,6 +1003,101 @@ function WeekRow({
       </div>
       <div className="text-sm text-muted-foreground">
         {week.dates.length} days
+      </div>
+    </div>
+  );
+}
+
+// Month Row Component for displaying individual months
+function MonthRow({ 
+  month, 
+  isSelected, 
+  onToggle 
+}: { 
+  month: { 
+    startDate: string; 
+    endDate: string; 
+    dates: string[]; 
+    monthLabel: string;
+    monthName: string;
+    year: number;
+  }; 
+  isSelected: boolean; 
+  onToggle: () => void; 
+}) {
+  const [completion, setCompletion] = useState<{
+    completionPercentage: number;
+    status: 'empty' | 'partial' | 'complete';
+  }>({ completionPercentage: 0, status: 'empty' });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCompletion = async () => {
+      setIsLoading(true);
+      try {
+        const result = await calculateMonthCompletion(month.dates);
+        setCompletion({
+          completionPercentage: result.completionPercentage,
+          status: result.status,
+        });
+      } catch (error) {
+        console.error('Error fetching month completion:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCompletion();
+  }, [month.dates]);
+
+  const getStatusIndicator = () => {
+    if (isLoading) {
+      return <div className="w-3 h-3 rounded-full bg-muted animate-pulse"></div>;
+    }
+    
+    switch (completion.status) {
+      case 'complete':
+        return <div className="w-3 h-3 rounded-full bg-green-500"></div>;
+      case 'partial':
+        return <div className="w-3 h-3 rounded-full bg-yellow-500"></div>;
+      case 'empty':
+        return <div className="w-3 h-3 rounded-full bg-red-500"></div>;
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between p-4 rounded-xl transition-all duration-300 hover:bg-muted/50 cursor-pointer",
+        isSelected ? "bg-primary/10 border border-primary/20" : "bg-muted/30"
+      )}
+      onClick={onToggle}
+      data-testid={`month-row-${month.monthName}-${month.year}`}
+    >
+      <div className="flex items-center gap-4">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={onToggle}
+          className="h-5 w-5"
+          data-testid={`checkbox-month-${month.monthName}-${month.year}`}
+        />
+        <div className="flex items-center gap-3">
+          {getStatusIndicator()}
+          <div>
+            <h4 className="font-medium text-foreground" data-testid={`text-month-label-${month.monthName}-${month.year}`}>
+              {month.monthLabel}
+            </h4>
+            <p className="text-sm text-muted-foreground" data-testid={`text-month-completion-${month.monthName}-${month.year}`}>
+              {isLoading 
+                ? 'Loading...' 
+                : `${completion.completionPercentage}% completed`
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="text-sm text-muted-foreground">
+        {month.dates.length} days
       </div>
     </div>
   );

@@ -111,6 +111,105 @@ export function getPastWeeks(numberOfWeeks: number = 12): Array<{
 }
 
 /**
+ * Generate weeks from January 1st up to current week (excluding future weeks)
+ * Returns an array of week objects with start/end dates and date arrays
+ */
+export function getWeeksFromJanuary(): Array<{
+  startDate: string;
+  endDate: string;
+  dates: string[];
+  weekLabel: string;
+}> {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const januaryFirst = new Date(currentYear, 0, 1); // January 1st of current year
+  
+  const weeks: Array<{
+    startDate: string;
+    endDate: string;
+    dates: string[];
+    weekLabel: string;
+  }> = [];
+  
+  // Start from the first week of January and go forward
+  let currentWeekStart = getWeekStart(januaryFirst);
+  
+  while (currentWeekStart <= today) {
+    const currentWeekEnd = getWeekEnd(currentWeekStart);
+    
+    // Only include weeks that are in the past or current (not future)
+    if (currentWeekEnd <= today) {
+      const dates = getWeekDatesArray(currentWeekStart);
+      const weekLabel = formatWeekLabel(currentWeekStart, currentWeekEnd);
+      
+      weeks.push({
+        startDate: currentWeekStart.toISOString().split('T')[0],
+        endDate: currentWeekEnd.toISOString().split('T')[0],
+        dates,
+        weekLabel,
+      });
+    }
+    
+    // Move to next week
+    currentWeekStart = new Date(currentWeekStart);
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  }
+  
+  return weeks;
+}
+
+/**
+ * Generate months from January up to current month (excluding current month)
+ * Returns an array of month objects with start/end dates and date arrays
+ */
+export function getPastMonthsFromJanuary(): Array<{
+  startDate: string;
+  endDate: string;
+  dates: string[];
+  monthLabel: string;
+  monthName: string;
+  year: number;
+}> {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-based (0 = January, 11 = December)
+  
+  const months: Array<{
+    startDate: string;
+    endDate: string;
+    dates: string[];
+    monthLabel: string;
+    monthName: string;
+    year: number;
+  }> = [];
+  
+  // Generate months from January (0) up to current month (excluding current month)
+  for (let monthIndex = 0; monthIndex < currentMonth; monthIndex++) {
+    const firstDay = new Date(currentYear, monthIndex, 1);
+    const lastDay = new Date(currentYear, monthIndex + 1, 0); // Last day of the month
+    
+    const monthDates: string[] = [];
+    for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+      monthDates.push(d.toISOString().split('T')[0]);
+    }
+    
+    const monthName = firstDay.toLocaleDateString('en-US', { month: 'long' });
+    const monthLabel = `${monthName} ${currentYear}`;
+    
+    months.push({
+      startDate: monthDates[0],
+      endDate: monthDates[monthDates.length - 1],
+      dates: monthDates,
+      monthLabel,
+      monthName,
+      year: currentYear,
+    });
+  }
+  
+  return months;
+}
+
+/**
  * Format week label for display (e.g., "Dec 9-15, 2024")
  */
 export function formatWeekLabel(startDate: Date, endDate: Date): string {
@@ -170,6 +269,58 @@ export async function calculateWeekCompletion(dates: string[]): Promise<{
     };
   } catch (error) {
     console.error('Error calculating week completion:', error);
+    return {
+      completionPercentage: 0,
+      completedPrayers: 0,
+      totalPrayers: dates.length * 5,
+      status: 'empty',
+    };
+  }
+}
+
+/**
+ * Calculate month completion percentage based on prayer records
+ */
+export async function calculateMonthCompletion(dates: string[]): Promise<{
+  completionPercentage: number;
+  completedPrayers: number;
+  totalPrayers: number;
+  status: 'empty' | 'partial' | 'complete';
+}> {
+  try {
+    const records = await apiService.getPrayerRecords(dates[0], dates[dates.length - 1]);
+    
+    let completedPrayers = 0;
+    let totalPrayers = dates.length * 5; // 5 prayers per day
+    
+    dates.forEach(date => {
+      const record = records.find(r => r.date === date);
+      if (record && record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          if (prayer.completed) {
+            completedPrayers++;
+          }
+        });
+      }
+    });
+    
+    const completionPercentage = totalPrayers > 0 ? Math.round((completedPrayers / totalPrayers) * 100) : 0;
+    
+    let status: 'empty' | 'partial' | 'complete' = 'empty';
+    if (completionPercentage === 100) {
+      status = 'complete';
+    } else if (completionPercentage > 0) {
+      status = 'partial';
+    }
+    
+    return {
+      completionPercentage,
+      completedPrayers,
+      totalPrayers,
+      status,
+    };
+  } catch (error) {
+    console.error('Error calculating month completion:', error);
     return {
       completionPercentage: 0,
       completedPrayers: 0,
