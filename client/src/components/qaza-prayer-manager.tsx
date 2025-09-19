@@ -46,7 +46,11 @@ export function QazaPrayerManager() {
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">("daily");
   
   // Daily view state
-  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
+  });
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [editedPrayers, setEditedPrayers] = useState<DailyPrayers>(defaultPrayers);
   const [originalPrayers, setOriginalPrayers] = useState<DailyPrayers>(defaultPrayers);
