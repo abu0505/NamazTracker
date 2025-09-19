@@ -107,7 +107,7 @@ export function getPastWeeks(numberOfWeeks: number = 12): Array<{
     }
   }
   
-  return weeks.reverse(); // Return in chronological order (oldest first)
+  return weeks; // Return in descending order (most recent first)
 }
 
 /**
@@ -155,7 +155,7 @@ export function getWeeksFromJanuary(): Array<{
     currentWeekStart.setDate(currentWeekStart.getDate() + 7);
   }
   
-  return weeks;
+  return weeks.reverse(); // Return in descending order (most recent first)
 }
 
 /**
@@ -183,8 +183,8 @@ export function getPastMonthsFromJanuary(): Array<{
     year: number;
   }> = [];
   
-  // Generate months from January (0) up to current month (excluding current month)
-  for (let monthIndex = 0; monthIndex < currentMonth; monthIndex++) {
+  // Generate months from most recent back to January (descending order)
+  for (let monthIndex = currentMonth - 1; monthIndex >= 0; monthIndex--) {
     const firstDay = new Date(currentYear, monthIndex, 1);
     const lastDay = new Date(currentYear, monthIndex + 1, 0); // Last day of the month
     
@@ -380,9 +380,10 @@ export function getYearDates(): string[] {
   return yearDates;
 }
 
-// Get date range for a specific time period
+// Get date range for a specific time period (only up to today)
 export function getDateRangeForPeriod(period: 'week' | 'month' | 'year', referenceDate?: Date): { startDate: string; endDate: string; dates: string[] } {
   const today = referenceDate || new Date();
+  const todayString = today.toISOString().split('T')[0];
   
   switch (period) {
     case 'week': {
@@ -393,22 +394,26 @@ export function getDateRangeForPeriod(period: 'week' | 'month' | 'year', referen
       for (let i = 0; i < 7; i++) {
         const date = new Date(monday);
         date.setDate(monday.getDate() + i);
-        weekDates.push(date.toISOString().split('T')[0]);
+        const dateString = date.toISOString().split('T')[0];
+        
+        // Only include dates up to today
+        if (dateString <= todayString) {
+          weekDates.push(dateString);
+        }
       }
       
       return {
         startDate: weekDates[0],
-        endDate: weekDates[6],
+        endDate: weekDates[weekDates.length - 1],
         dates: weekDates
       };
     }
     
     case 'month': {
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       
       const monthDates: string[] = [];
-      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(firstDay); d <= today; d.setDate(d.getDate() + 1)) {
         monthDates.push(d.toISOString().split('T')[0]);
       }
       
@@ -421,10 +426,9 @@ export function getDateRangeForPeriod(period: 'week' | 'month' | 'year', referen
     
     case 'year': {
       const firstDay = new Date(today.getFullYear(), 0, 1);
-      const lastDay = new Date(today.getFullYear(), 11, 31);
       
       const yearDates: string[] = [];
-      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(firstDay); d <= today; d.setDate(d.getDate() + 1)) {
         yearDates.push(d.toISOString().split('T')[0]);
       }
       
