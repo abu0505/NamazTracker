@@ -1,4 +1,4 @@
-import { Trophy, Star, Medal, Calendar, Flame, Target, CheckCircle, Award, Crown, Zap } from 'lucide-react';
+import { Trophy, Star, Medal, Calendar, Flame, Target, CheckCircle, Award, Crown, Zap, Moon, Sun, Shield, RotateCcw, CalendarDays } from 'lucide-react';
 import { Achievement } from '@shared/schema';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +34,12 @@ const achievementIcons = {
   prayer_milestone: Target,
   consistency: Calendar,
   early_bird: Star,
+  night_owl: Moon,
+  golden_hour: Sun,
+  weekend_warrior: Shield,
   dedication: Crown,
+  comeback: RotateCcw,
+  monthly_champion: CalendarDays,
   special: Award,
   seasonal: Zap,
 };
@@ -47,7 +52,12 @@ const achievementGradients = {
   prayer_milestone: 'from-yellow-400 to-yellow-600',
   consistency: 'from-teal-400 to-teal-600',
   early_bird: 'from-pink-400 to-pink-600',
+  night_owl: 'from-slate-400 to-slate-600',
+  golden_hour: 'from-amber-400 to-orange-500',
+  weekend_warrior: 'from-cyan-400 to-cyan-600',
   dedication: 'from-indigo-400 to-indigo-600',
+  comeback: 'from-lime-400 to-green-500',
+  monthly_champion: 'from-violet-400 to-purple-500',
   special: 'from-amber-400 to-amber-600',
   seasonal: 'from-emerald-400 to-emerald-600',
   default: 'from-primary to-accent'
@@ -109,6 +119,41 @@ export function AchievementCard({ achievement, index }: AchievementCardProps) {
         {achievement.metadata?.period && (
           <p data-testid={`achievement-period-${index}`}>
             <strong>Period:</strong> {achievement.metadata.period}
+          </p>
+        )}
+        {achievement.metadata?.consecutiveDays && (
+          <p data-testid={`achievement-consecutive-${index}`}>
+            <strong>Consecutive:</strong> {achievement.metadata.consecutiveDays} days
+          </p>
+        )}
+        {achievement.metadata?.prayerType && (
+          <p data-testid={`achievement-prayer-type-${index}`}>
+            <strong>Prayer:</strong> {achievement.metadata.prayerType.charAt(0).toUpperCase() + achievement.metadata.prayerType.slice(1)}
+          </p>
+        )}
+        {achievement.metadata?.perfectWeekends && (
+          <p data-testid={`achievement-weekends-${index}`}>
+            <strong>Perfect Weekends:</strong> {achievement.metadata.perfectWeekends}
+          </p>
+        )}
+        {achievement.metadata?.consecutiveWeekends && (
+          <p data-testid={`achievement-consecutive-weekends-${index}`}>
+            <strong>Consecutive Weekends:</strong> {achievement.metadata.consecutiveWeekends}
+          </p>
+        )}
+        {achievement.metadata?.comebackDays && (
+          <p data-testid={`achievement-comeback-${index}`}>
+            <strong>Comeback:</strong> {achievement.metadata.comebackDays} days
+          </p>
+        )}
+        {achievement.metadata?.perfectMonths && (
+          <p data-testid={`achievement-perfect-months-${index}`}>
+            <strong>Perfect Months:</strong> {achievement.metadata.perfectMonths}
+          </p>
+        )}
+        {achievement.metadata?.specialMonth && (
+          <p data-testid={`achievement-special-month-${index}`}>
+            <strong>Special Month:</strong> {achievement.metadata.specialMonth}
           </p>
         )}
       </div>

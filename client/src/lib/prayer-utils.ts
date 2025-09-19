@@ -805,6 +805,38 @@ export async function checkAchievements(prayers: DailyPrayers, weekProgress: num
     });
   }
   
+  // Early Bird Achievements (Fajr consistency)
+  const earlyBirdAchievements = await checkEarlyBirdAchievements();
+  achievements.push(...earlyBirdAchievements);
+  
+  // Night Owl Achievements (Isha consistency)
+  const nightOwlAchievements = await checkNightOwlAchievements();
+  achievements.push(...nightOwlAchievements);
+  
+  // Golden Hour Achievements (Maghrib consistency)
+  const goldenHourAchievements = await checkGoldenHourAchievements();
+  achievements.push(...goldenHourAchievements);
+  
+  // Weekend Warrior Achievements
+  const weekendWarriorAchievements = await checkWeekendWarriorAchievements();
+  achievements.push(...weekendWarriorAchievements);
+  
+  // Dedication Achievements (Weekend streaks)
+  const dedicationAchievements = await checkDedicationAchievements();
+  achievements.push(...dedicationAchievements);
+  
+  // Comeback Achievements
+  const comebackAchievements = await checkComebackAchievements();
+  achievements.push(...comebackAchievements);
+  
+  // Monthly Champion Achievements
+  const monthlyChampionAchievements = await checkMonthlyChampionAchievements();
+  achievements.push(...monthlyChampionAchievements);
+  
+  // Seasonal Achievements
+  const seasonalAchievements = await checkSeasonalAchievements();
+  achievements.push(...seasonalAchievements);
+  
   return achievements;
 }
 
@@ -1556,5 +1588,687 @@ export async function getYearlyQazaStats(): Promise<{
       qazaRemaining,
       currentYear
     };
+  }
+}
+
+// Check Early Bird achievements (Fajr consistency)
+export async function checkEarlyBirdAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [3, 7, 15, 30, 60, 100];
+    
+    for (const milestone of milestones) {
+      const consecutiveDays = await checkConsecutivePrayerCompletion('fajr', milestone);
+      
+      if (consecutiveDays >= milestone) {
+        let title, description;
+        
+        switch (milestone) {
+          case 3:
+            title = "Early Starter";
+            description = "3 consecutive days of Fajr prayers!";
+            break;
+          case 7:
+            title = "Dawn Devotee";
+            description = "1 week of consistent Fajr prayers!";
+            break;
+          case 15:
+            title = "Morning Master";
+            description = "15 days of Fajr dedication!";
+            break;
+          case 30:
+            title = "Fajr Champion";
+            description = "30 days of early morning devotion!";
+            break;
+          case 60:
+            title = "Early Bird Legend";
+            description = "60 days of Fajr consistency!";
+            break;
+          case 100:
+            title = "Dawn Guardian";
+            description = "100 days of Fajr mastery!";
+            break;
+          default:
+            title = `Early Bird ${milestone}`;
+            description = `${milestone} consecutive Fajr prayers!`;
+        }
+        
+        achievements.push({
+          type: 'early_bird',
+          title,
+          description,
+          metadata: {
+            consecutiveDays: milestone,
+            prayerType: 'fajr',
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Early Bird achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Night Owl achievements (Isha consistency)
+export async function checkNightOwlAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [3, 7, 15, 30, 60, 100];
+    
+    for (const milestone of milestones) {
+      const consecutiveDays = await checkConsecutivePrayerCompletion('isha', milestone);
+      
+      if (consecutiveDays >= milestone) {
+        let title, description;
+        
+        switch (milestone) {
+          case 3:
+            title = "Night Starter";
+            description = "3 consecutive nights of Isha prayers!";
+            break;
+          case 7:
+            title = "Evening Devotee";
+            description = "1 week of consistent Isha prayers!";
+            break;
+          case 15:
+            title = "Night Master";
+            description = "15 nights of Isha dedication!";
+            break;
+          case 30:
+            title = "Isha Champion";
+            description = "30 nights of evening devotion!";
+            break;
+          case 60:
+            title = "Night Owl Legend";
+            description = "60 nights of Isha consistency!";
+            break;
+          case 100:
+            title = "Night Guardian";
+            description = "100 nights of Isha mastery!";
+            break;
+          default:
+            title = `Night Owl ${milestone}`;
+            description = `${milestone} consecutive Isha prayers!`;
+        }
+        
+        achievements.push({
+          type: 'night_owl',
+          title,
+          description,
+          metadata: {
+            consecutiveDays: milestone,
+            prayerType: 'isha',
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Night Owl achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Golden Hour achievements (Maghrib consistency)
+export async function checkGoldenHourAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [3, 7, 15, 30, 60, 100];
+    
+    for (const milestone of milestones) {
+      const consecutiveDays = await checkConsecutivePrayerCompletion('maghrib', milestone);
+      
+      if (consecutiveDays >= milestone) {
+        let title, description;
+        
+        switch (milestone) {
+          case 3:
+            title = "Sunset Starter";
+            description = "3 consecutive days of Maghrib prayers!";
+            break;
+          case 7:
+            title = "Golden Devotee";
+            description = "1 week of consistent Maghrib prayers!";
+            break;
+          case 15:
+            title = "Sunset Master";
+            description = "15 days of Maghrib dedication!";
+            break;
+          case 30:
+            title = "Maghrib Champion";
+            description = "30 days of golden hour devotion!";
+            break;
+          case 60:
+            title = "Golden Hour Legend";
+            description = "60 days of Maghrib consistency!";
+            break;
+          case 100:
+            title = "Sunset Guardian";
+            description = "100 days of Maghrib mastery!";
+            break;
+          default:
+            title = `Golden Hour ${milestone}`;
+            description = `${milestone} consecutive Maghrib prayers!`;
+        }
+        
+        achievements.push({
+          type: 'golden_hour',
+          title,
+          description,
+          metadata: {
+            consecutiveDays: milestone,
+            prayerType: 'maghrib',
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Golden Hour achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Weekend Warrior achievements
+export async function checkWeekendWarriorAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [1, 2, 4, 8, 12, 24];
+    
+    for (const milestone of milestones) {
+      const perfectWeekends = await countPerfectWeekends();
+      
+      if (perfectWeekends >= milestone) {
+        let title, description;
+        
+        switch (milestone) {
+          case 1:
+            title = "Weekend Starter";
+            description = "First perfect weekend achieved!";
+            break;
+          case 2:
+            title = "Weekend Enthusiast";
+            description = "2 perfect weekends completed!";
+            break;
+          case 4:
+            title = "Weekend Champion";
+            description = "4 perfect weekends in a month!";
+            break;
+          case 8:
+            title = "Weekend Master";
+            description = "8 perfect weekends achieved!";
+            break;
+          case 12:
+            title = "Weekend Legend";
+            description = "12 perfect weekends completed!";
+            break;
+          case 24:
+            title = "Weekend Guardian";
+            description = "24 perfect weekends mastered!";
+            break;
+          default:
+            title = `Weekend Warrior ${milestone}`;
+            description = `${milestone} perfect weekends achieved!`;
+        }
+        
+        achievements.push({
+          type: 'weekend_warrior',
+          title,
+          description,
+          metadata: {
+            perfectWeekends: milestone,
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Weekend Warrior achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Dedication achievements (Weekend streaks)
+export async function checkDedicationAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [3, 7, 15, 30];
+    
+    for (const milestone of milestones) {
+      const consecutiveWeekends = await checkConsecutiveWeekendStreaks();
+      
+      if (consecutiveWeekends >= milestone) {
+        let title, description;
+        
+        switch (milestone) {
+          case 3:
+            title = "Dedicated Beginner";
+            description = "3 consecutive perfect weekends!";
+            break;
+          case 7:
+            title = "Weekend Devotee";
+            description = "7 consecutive perfect weekends!";
+            break;
+          case 15:
+            title = "Dedication Master";
+            description = "15 consecutive perfect weekends!";
+            break;
+          case 30:
+            title = "Ultimate Dedication";
+            description = "30 consecutive perfect weekends!";
+            break;
+          default:
+            title = `Dedication ${milestone}`;
+            description = `${milestone} consecutive perfect weekends!`;
+        }
+        
+        achievements.push({
+          type: 'dedication',
+          title,
+          description,
+          metadata: {
+            consecutiveWeekends: milestone,
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Dedication achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Comeback achievements
+export async function checkComebackAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [3, 7, 15, 30];
+    
+    for (const milestone of milestones) {
+      const isComeback = await checkIfComebackStreak(milestone);
+      
+      if (isComeback) {
+        let title, description;
+        
+        switch (milestone) {
+          case 3:
+            title = "Fresh Start";
+            description = "3 days back on track after missing prayers!";
+            break;
+          case 7:
+            title = "Comeback Kid";
+            description = "1 week of prayers after a setback!";
+            break;
+          case 15:
+            title = "Resilient Soul";
+            description = "15 days of recovery and dedication!";
+            break;
+          case 30:
+            title = "Phoenix Rising";
+            description = "30 days of comeback dedication!";
+            break;
+          default:
+            title = `Comeback ${milestone}`;
+            description = `${milestone} days of recovery after missed prayers!`;
+        }
+        
+        achievements.push({
+          type: 'comeback',
+          title,
+          description,
+          metadata: {
+            comebackDays: milestone,
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Comeback achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Monthly Champion achievements
+export async function checkMonthlyChampionAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const milestones = [1, 2, 3, 6, 12];
+    
+    for (const milestone of milestones) {
+      const perfectMonths = await countPerfectMonths();
+      
+      if (perfectMonths >= milestone) {
+        let title, description;
+        
+        switch (milestone) {
+          case 1:
+            title = "Monthly Achiever";
+            description = "First perfect month completed!";
+            break;
+          case 2:
+            title = "Bi-Monthly Champion";
+            description = "2 perfect months achieved!";
+            break;
+          case 3:
+            title = "Quarterly Master";
+            description = "3 perfect months completed!";
+            break;
+          case 6:
+            title = "Half-Year Champion";
+            description = "6 perfect months achieved!";
+            break;
+          case 12:
+            title = "Yearly Champion";
+            description = "12 perfect months - A full year!";
+            break;
+          default:
+            title = `Monthly Champion ${milestone}`;
+            description = `${milestone} perfect months achieved!`;
+        }
+        
+        achievements.push({
+          type: 'monthly_champion',
+          title,
+          description,
+          metadata: {
+            perfectMonths: milestone,
+            earnedDate: getTodayString()
+          }
+        });
+        break; // Only award the current milestone
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Monthly Champion achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Check Seasonal achievements
+export async function checkSeasonalAchievements(): Promise<Array<{ type: string; title: string; description: string; metadata: any }>> {
+  const achievements: Array<{ type: string; title: string; description: string; metadata: any }> = [];
+  
+  try {
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+    const currentYear = new Date().getFullYear();
+    
+    // Check for Ramadan (approximate - month 9 in Islamic calendar, but using month check for simplicity)
+    if (currentMonth === 4 && isEndOfMonth()) { // April as example Ramadan month
+      const monthProgress = await calculateMonthProgressFromAPI();
+      if (monthProgress === 100) {
+        achievements.push({
+          type: 'seasonal',
+          title: "Ramadan Champion",
+          description: "Perfect prayers throughout the holy month!",
+          metadata: {
+            specialMonth: 'Ramadan',
+            month: currentMonth,
+            year: currentYear,
+            earnedDate: getTodayString()
+          }
+        });
+      }
+    }
+    
+    // Check for perfect prayers during Dhul Hijjah (month 12)
+    if (currentMonth === 7 && isEndOfMonth()) { // July as example Dhul Hijjah month
+      const monthProgress = await calculateMonthProgressFromAPI();
+      if (monthProgress === 100) {
+        achievements.push({
+          type: 'seasonal',
+          title: "Hajj Month Devotee",
+          description: "Perfect prayers during Dhul Hijjah!",
+          metadata: {
+            specialMonth: 'Dhul Hijjah',
+            month: currentMonth,
+            year: currentYear,
+            earnedDate: getTodayString()
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check Seasonal achievements:', error);
+  }
+  
+  return achievements;
+}
+
+// Helper function to check consecutive prayer completion for a specific prayer
+export async function checkConsecutivePrayerCompletion(prayerType: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha', targetDays: number): Promise<number> {
+  try {
+    let consecutiveDays = 0;
+    const today = new Date();
+    
+    for (let i = 0; i < targetDays + 10; i++) { // Check a few extra days to be sure
+      const checkDate = new Date(today);
+      checkDate.setDate(today.getDate() - i);
+      const dateString = checkDate.toISOString().split('T')[0];
+      
+      const record = await apiService.getPrayerRecord(dateString);
+      
+      if (record && record.prayers && record.prayers[prayerType] && record.prayers[prayerType].completed) {
+        consecutiveDays++;
+      } else {
+        break; // Streak broken
+      }
+    }
+    
+    return consecutiveDays;
+  } catch (error) {
+    console.error(`Failed to check consecutive ${prayerType} completion:`, error);
+    return 0;
+  }
+}
+
+// Helper function to count perfect weekends
+export async function countPerfectWeekends(): Promise<number> {
+  try {
+    const { startDate, endDate } = getDateRangeForPeriod('year');
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    let perfectWeekends = 0;
+    const weekends: { [key: string]: { saturday: boolean; sunday: boolean } } = {};
+    
+    records.forEach(record => {
+      const date = new Date(record.date);
+      const dayOfWeek = date.getDay();
+      
+      if (dayOfWeek === 6 || dayOfWeek === 0) { // Saturday or Sunday
+        const weekKey = getWeekStart(date).toISOString().split('T')[0];
+        
+        if (!weekends[weekKey]) {
+          weekends[weekKey] = { saturday: false, sunday: false };
+        }
+        
+        if (record.prayers) {
+          const prayers = convertPrayerRecordToDailyPrayers(record);
+          if (prayers) {
+            const allCompleted = Object.values(prayers).every(prayer => prayer.completed);
+            if (dayOfWeek === 6) weekends[weekKey].saturday = allCompleted;
+            if (dayOfWeek === 0) weekends[weekKey].sunday = allCompleted;
+          }
+        }
+      }
+    });
+    
+    // Count weekends where both Saturday and Sunday were perfect
+    Object.values(weekends).forEach(weekend => {
+      if (weekend.saturday && weekend.sunday) {
+        perfectWeekends++;
+      }
+    });
+    
+    return perfectWeekends;
+  } catch (error) {
+    console.error('Failed to count perfect weekends:', error);
+    return 0;
+  }
+}
+
+// Helper function to check consecutive weekend streaks
+export async function checkConsecutiveWeekendStreaks(): Promise<number> {
+  try {
+    let consecutiveWeekends = 0;
+    const today = new Date();
+    let currentWeekStart = getWeekStart(today);
+    
+    // Go back weekend by weekend
+    for (let i = 0; i < 52; i++) { // Check up to a year of weekends
+      const saturday = new Date(currentWeekStart);
+      saturday.setDate(currentWeekStart.getDate() + 5);
+      const sunday = new Date(currentWeekStart);
+      sunday.setDate(currentWeekStart.getDate() + 6);
+      
+      const saturdayRecord = await apiService.getPrayerRecord(saturday.toISOString().split('T')[0]);
+      const sundayRecord = await apiService.getPrayerRecord(sunday.toISOString().split('T')[0]);
+      
+      let weekendPerfect = true;
+      
+      // Check Saturday
+      if (saturdayRecord && saturdayRecord.prayers) {
+        const saturdayPrayers = convertPrayerRecordToDailyPrayers(saturdayRecord);
+        if (!saturdayPrayers || !Object.values(saturdayPrayers).every(prayer => prayer.completed)) {
+          weekendPerfect = false;
+        }
+      } else {
+        weekendPerfect = false;
+      }
+      
+      // Check Sunday
+      if (sundayRecord && sundayRecord.prayers) {
+        const sundayPrayers = convertPrayerRecordToDailyPrayers(sundayRecord);
+        if (!sundayPrayers || !Object.values(sundayPrayers).every(prayer => prayer.completed)) {
+          weekendPerfect = false;
+        }
+      } else {
+        weekendPerfect = false;
+      }
+      
+      if (weekendPerfect) {
+        consecutiveWeekends++;
+        currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+      } else {
+        break;
+      }
+    }
+    
+    return consecutiveWeekends;
+  } catch (error) {
+    console.error('Failed to check consecutive weekend streaks:', error);
+    return 0;
+  }
+}
+
+// Helper function to check if current streak is a comeback after missed prayers
+export async function checkIfComebackStreak(targetDays: number): Promise<boolean> {
+  try {
+    const today = new Date();
+    let currentStreak = 0;
+    let foundMissedPrayers = false;
+    
+    // Check current streak
+    for (let i = 0; i < targetDays + 5; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(today.getDate() - i);
+      const dateString = checkDate.toISOString().split('T')[0];
+      
+      const record = await apiService.getPrayerRecord(dateString);
+      
+      if (record && record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          const allCompleted = Object.values(prayers).every(prayer => prayer.completed);
+          if (allCompleted) {
+            currentStreak++;
+          } else {
+            if (currentStreak >= targetDays) {
+              foundMissedPrayers = true;
+              break;
+            }
+            return false;
+          }
+        }
+      } else {
+        if (currentStreak >= targetDays) {
+          foundMissedPrayers = true;
+          break;
+        }
+        return false;
+      }
+    }
+    
+    return currentStreak >= targetDays && foundMissedPrayers;
+  } catch (error) {
+    console.error('Failed to check comeback streak:', error);
+    return false;
+  }
+}
+
+// Helper function to count perfect months
+export async function countPerfectMonths(): Promise<number> {
+  try {
+    const { startDate, endDate } = getDateRangeForPeriod('year');
+    const records = await apiService.getPrayerRecords(startDate, endDate);
+    
+    const months: { [key: string]: { completed: number; total: number } } = {};
+    
+    // Group records by month
+    records.forEach(record => {
+      const date = new Date(record.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!months[monthKey]) {
+        months[monthKey] = { completed: 0, total: 0 };
+      }
+      
+      if (record.prayers) {
+        Object.values(record.prayers).forEach(prayer => {
+          months[monthKey].total++;
+          if (prayer.completed) {
+            months[monthKey].completed++;
+          }
+        });
+      } else {
+        months[monthKey].total += 5;
+      }
+    });
+    
+    // Count months with 100% completion
+    let perfectMonths = 0;
+    Object.values(months).forEach(month => {
+      if (month.total > 0 && month.completed === month.total) {
+        perfectMonths++;
+      }
+    });
+    
+    return perfectMonths;
+  } catch (error) {
+    console.error('Failed to count perfect months:', error);
+    return 0;
   }
 }
