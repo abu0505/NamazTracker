@@ -277,38 +277,69 @@ export function QazaPrayerManager() {
   };
 
   const handleBatchUpdate = () => {
-    if (selectedWeeks.size === 0) return;
+    // Check if either weeks or months are selected
+    if (selectedWeeks.size === 0 && selectedMonths.size === 0) return;
 
     // Calculate batch update details
     const updates: Array<{ date: string; prayers: DailyPrayers }> = [];
     let earliestDate: string | null = null;
     let latestDate: string | null = null;
     
-    selectedWeeks.forEach(weekKey => {
-      const week = pastWeeks.find(w => `${w.startDate}-${w.endDate}` === weekKey);
-      if (week) {
-        week.dates.forEach(date => {
-          if (!earliestDate || date < earliestDate) earliestDate = date;
-          if (!latestDate || date > latestDate) latestDate = date;
-          
-          const prayers: DailyPrayers = {
-            fajr: { completed: isMarkingAsCompleted, onTime: false },
-            dhuhr: { completed: isMarkingAsCompleted, onTime: false },
-            asr: { completed: isMarkingAsCompleted, onTime: false },
-            maghrib: { completed: isMarkingAsCompleted, onTime: false },
-            isha: { completed: isMarkingAsCompleted, onTime: false },
-          };
-          updates.push({ date, prayers });
-        });
-      }
-    });
+    // Handle weekly updates
+    if (selectedWeeks.size > 0) {
+      selectedWeeks.forEach(weekKey => {
+        const week = pastWeeks.find(w => `${w.startDate}-${w.endDate}` === weekKey);
+        if (week) {
+          week.dates.forEach(date => {
+            if (!earliestDate || date < earliestDate) earliestDate = date;
+            if (!latestDate || date > latestDate) latestDate = date;
+            
+            const prayers: DailyPrayers = {
+              fajr: { completed: isMarkingAsCompleted, onTime: false },
+              dhuhr: { completed: isMarkingAsCompleted, onTime: false },
+              asr: { completed: isMarkingAsCompleted, onTime: false },
+              maghrib: { completed: isMarkingAsCompleted, onTime: false },
+              isha: { completed: isMarkingAsCompleted, onTime: false },
+            };
+            updates.push({ date, prayers });
+          });
+        }
+      });
+    }
+
+    // Handle monthly updates
+    if (selectedMonths.size > 0) {
+      selectedMonths.forEach(monthKey => {
+        const month = pastMonths.find(m => `${m.monthName}-${m.year}` === monthKey);
+        if (month) {
+          month.dates.forEach(date => {
+            if (!earliestDate || date < earliestDate) earliestDate = date;
+            if (!latestDate || date > latestDate) latestDate = date;
+            
+            const prayers: DailyPrayers = {
+              fajr: { completed: isMonthMarkingAsCompleted, onTime: false },
+              dhuhr: { completed: isMonthMarkingAsCompleted, onTime: false },
+              asr: { completed: isMonthMarkingAsCompleted, onTime: false },
+              maghrib: { completed: isMonthMarkingAsCompleted, onTime: false },
+              isha: { completed: isMonthMarkingAsCompleted, onTime: false },
+            };
+            updates.push({ date, prayers });
+          });
+        }
+      });
+    }
 
     // Set confirmation details and show dialog
+    const weekCount = selectedWeeks.size;
+    const action = selectedWeeks.size > 0 
+      ? (isMarkingAsCompleted ? 'completed' : 'missed')
+      : (isMonthMarkingAsCompleted ? 'completed' : 'missed');
+
     setConfirmationDetails({
-      weekCount: selectedWeeks.size,
+      weekCount: weekCount,
       dateCount: updates.length,
       prayerCount: updates.length * 5, // 5 prayers per day
-      action: isMarkingAsCompleted ? 'completed' : 'missed',
+      action: action,
       dateRange: { 
         start: earliestDate || '', 
         end: latestDate || '' 
@@ -361,7 +392,39 @@ export function QazaPrayerManager() {
     }
 
     setShowConfirmDialog(false);
-    batchUpdateMutation.mutate(updates);
+    
+    // Split updates into batches of 7 (API limit) and send sequentially
+    const batchSize = 7;
+    const batches = [];
+    for (let i = 0; i < updates.length; i += batchSize) {
+      batches.push(updates.slice(i, i + batchSize));
+    }
+    
+    try {
+      // Send all batches sequentially
+      for (const batch of batches) {
+        await batchUpdateMutation.mutateAsync(batch);
+      }
+      
+      // Clear selections after successful batch updates
+      setSelectedWeeks(new Set());
+      setSelectedMonths(new Set());
+      setWeeklyHasChanges(false);
+      setMonthlyHasChanges(false);
+      
+      toast({
+        title: "Prayers Updated Successfully",
+        description: `Updated ${updates.length} day(s) across ${batches.length} batch(es)`,
+      });
+      
+    } catch (error) {
+      console.error('Batch update failed:', error);
+      toast({
+        title: "Batch Update Failed",
+        description: "Failed to update prayer records. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleWeeklyCancelChanges = () => {
@@ -618,14 +681,20 @@ export function QazaPrayerManager() {
           <div className="flex justify-center gap-4">
             <Button
               variant={isMarkingAsCompleted ? "default" : "outline"}
-              onClick={() => setIsMarkingAsCompleted(true)}
+              onClick={() => {
+                setIsMarkingAsCompleted(true);
+                handleBatchUpdate();
+              }}
               data-testid="button-mark-completed"
             >
               Mark as Completed
             </Button>
             <Button
               variant={!isMarkingAsCompleted ? "default" : "outline"}
-              onClick={() => setIsMarkingAsCompleted(false)}
+              onClick={() => {
+                setIsMarkingAsCompleted(false);
+                handleBatchUpdate();
+              }}
               data-testid="button-mark-missed"
             >
               Mark as Missed
@@ -733,14 +802,20 @@ export function QazaPrayerManager() {
           <div className="flex justify-center gap-4">
             <Button
               variant={isMonthMarkingAsCompleted ? "default" : "outline"}
-              onClick={() => setIsMonthMarkingAsCompleted(true)}
+              onClick={() => {
+                setIsMonthMarkingAsCompleted(true);
+                handleBatchUpdate();
+              }}
               data-testid="button-monthly-mark-completed"
             >
               Mark as Completed
             </Button>
             <Button
               variant={!isMonthMarkingAsCompleted ? "default" : "outline"}
-              onClick={() => setIsMonthMarkingAsCompleted(false)}
+              onClick={() => {
+                setIsMonthMarkingAsCompleted(false);
+                handleBatchUpdate();
+              }}
               data-testid="button-monthly-mark-missed"
             >
               Mark as Missed
