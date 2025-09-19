@@ -2,6 +2,13 @@
 
 This is a modern Islamic Prayer Tracker web application built for tracking daily Namaz (Islamic prayers) with analytics, achievements, and a beautiful UI. The app helps users track their five daily prayers (Fajr, Dhuhr, Asr, Maghrib, and Isha), monitor their progress through visual analytics, earn achievements for consistent prayer completion, and maintain streaks. The application features a responsive design with dark/light theme support and glassmorphism UI elements.
 
+# Recent Changes (January 19, 2025)
+
+## UI/UX Improvements
+- **Toast Notifications**: Repositioned to top-right corner with glassmorphism effects including backdrop blur, semi-transparent backgrounds, and subtle borders for both light and dark modes
+- **Date Ordering**: All date lists (weeks, months) now display in descending order (most recent first) for improved usability and easier access to recent dates
+- **Qaza Prayer Calculations**: Fixed analytics calculations to accurately show Qaza prayers as (Total obligatory prayers for period up to today) - (prayers performed for period up to today), eliminating inflated counts from future dates
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
