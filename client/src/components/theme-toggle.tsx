@@ -17,7 +17,7 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="w-10 h-10 rounded-full bg-muted"
+        className="w-10 h-10 rounded-full"
         data-testid="button-theme-toggle"
         disabled
       >
@@ -32,7 +32,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="w-10 h-10 rounded-full bg-muted hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+      className="w-10 h-10 rounded-full hover:scale-110 hover:opacity-80 transition-all duration-300"
       data-testid="button-theme-toggle"
     >
       {theme === 'dark' ? (

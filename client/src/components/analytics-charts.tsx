@@ -65,7 +65,13 @@ export function AnalyticsCharts() {
     queryFn: createAuthAwareQuery(() => apiService.getYearlyQazaStats()),
   });
 
-  const isLoading = trendLoading || analyticsLoading || summaryLoading || yearlyQazaLoading;
+  // Fetch user statistics for Qaza vs On-time prayer comparison
+  const { data: userStatsData, isLoading: userStatsLoading } = useQuery({
+    queryKey: ['/api/stats'],
+    queryFn: createAuthAwareQuery(() => apiService.getUserStats()),
+  });
+
+  const isLoading = trendLoading || analyticsLoading || summaryLoading || yearlyQazaLoading || userStatsLoading;
 
   // Main trend chart data
   const mainChartData = {
@@ -164,6 +170,53 @@ export function AnalyticsCharts() {
     },
   };
 
+  // Qaza vs On-time prayer performance chart data
+  const qazaPerformanceData = {
+    labels: ['On-time Prayers', 'Qaza Prayers'],
+    datasets: [
+      {
+        data: [
+          userStatsData?.onTimePrayers || 0,
+          userStatsData?.qazaPrayers || 0,
+        ],
+        backgroundColor: [
+          'hsl(158, 70%, 50%)', // Green for on-time prayers
+          'hsl(0, 84.2%, 60.2%)', // Red for Qaza prayers
+        ],
+        borderWidth: 2,
+        borderColor: [
+          'hsl(158, 70%, 40%)',
+          'hsl(0, 84.2%, 50%)',
+        ],
+      },
+    ],
+  };
+
+  const qazaPerformanceOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: {
+          padding: 20,
+          font: {
+            size: 12,
+          },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            const total = (userStatsData?.onTimePrayers || 0) + (userStatsData?.qazaPrayers || 0);
+            const percentage = total > 0 ? Math.round((context.parsed / total) * 100) : 0;
+            return `${context.label}: ${context.parsed} (${percentage}%)`;
+          },
+        },
+      },
+    },
+  };
+
   // Statistics from summary data
   const totalPrayers = summaryData?.totalPrayers || 0;
   const totalPossible = summaryData?.totalPossible || 0;
@@ -209,7 +262,7 @@ export function AnalyticsCharts() {
           <div className="h-64 bg-muted rounded animate-pulse"></div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="glass-card rounded-2xl p-6">
             <div className="h-6 bg-muted rounded mb-4 w-32 animate-pulse"></div>
             <div className="h-48 bg-muted rounded animate-pulse"></div>
@@ -217,6 +270,15 @@ export function AnalyticsCharts() {
           <div className="glass-card rounded-2xl p-6">
             <div className="h-6 bg-muted rounded mb-4 w-32 animate-pulse"></div>
             <div className="h-48 bg-muted rounded animate-pulse"></div>
+          </div>
+          <div className="glass-card rounded-2xl p-6">
+            <div className="h-6 bg-muted rounded mb-4 w-32 animate-pulse"></div>
+            <div className="h-48 bg-muted rounded animate-pulse"></div>
+            <div className="mt-4 space-y-2">
+              <div className="h-4 bg-muted rounded animate-pulse"></div>
+              <div className="h-4 bg-muted rounded animate-pulse"></div>
+              <div className="h-4 bg-muted rounded animate-pulse"></div>
+            </div>
           </div>
         </div>
 
@@ -268,7 +330,7 @@ export function AnalyticsCharts() {
       </div>
 
       {/* Prayer-specific Charts */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="glass-card rounded-2xl p-6">
           <h3 className="text-lg font-semibold mb-4" data-testid="text-prayer-distribution">
             Prayer Distribution
@@ -284,6 +346,35 @@ export function AnalyticsCharts() {
           </h3>
           <div className="h-48">
             <Bar data={comparisonData} options={comparisonOptions} />
+          </div>
+        </div>
+
+        <div className="glass-card rounded-2xl p-6">
+          <h3 className="text-lg font-semibold mb-4" data-testid="text-qaza-performance">
+            Prayer Performance
+          </h3>
+          <div className="h-48">
+            <Doughnut data={qazaPerformanceData} options={qazaPerformanceOptions} />
+          </div>
+          <div className="mt-4 text-center space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">On-time:</span>
+              <span className="font-semibold text-green-600" data-testid="text-ontime-count">
+                {userStatsData?.onTimePrayers || 0}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Qaza:</span>
+              <span className="font-semibold text-red-600" data-testid="text-qaza-count">
+                {userStatsData?.qazaPrayers || 0}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm font-medium border-t pt-2">
+              <span className="text-muted-foreground">Total:</span>
+              <span data-testid="text-performance-total">
+                {(userStatsData?.onTimePrayers || 0) + (userStatsData?.qazaPrayers || 0)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
