@@ -33,14 +33,26 @@ async function updateUserStatistics(userId: string): Promise<void> {
     
     // Calculate current streak (from most recent date backwards)
     let streakBroken = false;
+    let previousDate: Date | null = null;
+    
     for (const record of sortedRecords) {
-      if (!streakBroken && record.prayers) {
+      if (record.prayers) {
+        const currentDate = new Date(record.date);
         const dayPrayers = Object.values(record.prayers);
         const allCompleted = dayPrayers.every(prayer => prayer.completed);
         
-        if (allCompleted) {
+        // Check for date gap (more than 1 day difference)
+        if (previousDate) {
+          const daysDiff = Math.floor((previousDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff > 1) {
+            streakBroken = true;
+          }
+        }
+        
+        if (!streakBroken && allCompleted) {
           currentStreak++;
-        } else {
+          previousDate = currentDate;
+        } else if (!allCompleted) {
           streakBroken = true;
         }
       }
@@ -56,8 +68,8 @@ async function updateUserStatistics(userId: string): Promise<void> {
         
         // Count prayers for totals
         dayPrayers.forEach(prayer => {
-          totalPrayers++;
           if (prayer.completed) {
+            totalPrayers++;
             if (prayer.onTime) {
               onTimePrayers++;
             }
@@ -89,7 +101,7 @@ async function updateUserStatistics(userId: string): Promise<void> {
     
     if (userStats) {
       await storage.updateUserStats(userId, {
-        totalPrayers: totalPrayers - qazaPrayers, // Only count completed prayers
+        totalPrayers,
         onTimePrayers,
         qazaPrayers,
         currentStreak,
@@ -101,7 +113,7 @@ async function updateUserStatistics(userId: string): Promise<void> {
     } else {
       await storage.createUserStats({
         userId,
-        totalPrayers: totalPrayers - qazaPrayers,
+        totalPrayers,
         onTimePrayers,
         qazaPrayers,
         currentStreak,
