@@ -2,6 +2,15 @@
 
 This is a modern Islamic Prayer Tracker web application that helps Muslims track their five daily prayers (Namaz/Salah) with analytics, achievements, and progress visualization. The app provides daily prayer tracking, historical record management (Qaza prayers), streak tracking, and gamification through achievements to encourage consistent prayer habits.
 
+# Recent Changes
+
+**October 2, 2025** - Configured for Replit environment:
+- Updated server to bind to 0.0.0.0:5000 for Replit compatibility
+- Connected to Replit PostgreSQL database (heliumdb)
+- Created demo user in database (id: 'demo-user')
+- Configured workflow with webview output for frontend
+- Set deployment target to autoscale with build and run commands
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -149,3 +158,21 @@ Preferred communication style: Simple, everyday language.
 - Vite for frontend bundling and dev server
 - esbuild for production backend compilation
 - cross-env for cross-platform environment variables
+
+# Replit Configuration
+
+**Environment Setup**
+- Server binds to 0.0.0.0:5000 for Replit proxy compatibility
+- Vite configured with `allowedHosts: true` to accept Replit's iframe proxy
+- Frontend workflow configured with webview output type on port 5000
+
+**Database**
+- Using Replit PostgreSQL (heliumdb) with DATABASE_URL environment variable
+- Demo user created with id 'demo-user' for development testing
+- All required tables exist: users, prayer_records, achievements, user_stats
+
+**Deployment**
+- Deployment target: autoscale (stateless web app)
+- Build command: `npm run build` (Vite + esbuild)
+- Run command: `npm run start` (production server)
+- Development: `npm run dev` (tsx with hot reload)
