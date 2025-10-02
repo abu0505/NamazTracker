@@ -2272,3 +2272,248 @@ export async function countPerfectMonths(): Promise<number> {
     return 0;
   }
 }
+
+// Helper function to get Hijri date (simple approximation)
+export function getHijriDate(gregorianDate?: Date): string {
+  const date = gregorianDate || new Date();
+  
+  // Hijri calendar is approximately 354 days long, so it's ~11 days shorter than Gregorian
+  // Hijri epoch: July 16, 622 CE (Gregorian)
+  const hijriEpoch = new Date(622, 6, 16).getTime();
+  const daysSinceEpoch = (date.getTime() - hijriEpoch) / (1000 * 60 * 60 * 24);
+  
+  // Approximate Hijri year (354.36 days per year)
+  const hijriYear = Math.floor(daysSinceEpoch / 354.36);
+  const dayInYear = Math.floor(daysSinceEpoch % 354.36);
+  
+  // Approximate month (29.5 days per month on average)
+  const month = Math.floor(dayInYear / 29.5) % 12;
+  const day = Math.floor(dayInYear % 29.5) + 1;
+  
+  const hijriMonths = [
+    "Muharram", "Safar", "Rabi' I", "Rabi' II", "Jumada I", "Jumada II",
+    "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"
+  ];
+  
+  return `${day} ${hijriMonths[month]} ${hijriYear}`;
+}
+
+// Helper function to get current time formatted
+export function getCurrentTime(): string {
+  const now = new Date();
+  return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+// Helper function to determine current prayer based on time
+export function getCurrentPrayer(): { name: string; emoji: string; key: string } | null {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  // Convert prayer times to minutes
+  const prayerMinutes = {
+    fajr: 5 * 60 + 30,     // 5:30 AM
+    dhuhr: 12 * 60 + 45,   // 12:45 PM
+    asr: 16 * 60 + 15,     // 4:15 PM
+    maghrib: 19 * 60 + 20, // 7:20 PM
+    isha: 20 * 60 + 45,    // 8:45 PM
+  };
+  
+  // Determine which prayer time is active
+  if (currentMinutes >= prayerMinutes.fajr && currentMinutes < prayerMinutes.dhuhr) {
+    return { name: 'Fajr', emoji: '🌅', key: 'fajr' };
+  } else if (currentMinutes >= prayerMinutes.dhuhr && currentMinutes < prayerMinutes.asr) {
+    return { name: 'Dhuhr', emoji: '☀️', key: 'dhuhr' };
+  } else if (currentMinutes >= prayerMinutes.asr && currentMinutes < prayerMinutes.maghrib) {
+    return { name: 'Asr', emoji: '🌤️', key: 'asr' };
+  } else if (currentMinutes >= prayerMinutes.maghrib && currentMinutes < prayerMinutes.isha) {
+    return { name: 'Maghrib', emoji: '🌅', key: 'maghrib' };
+  } else if (currentMinutes >= prayerMinutes.isha || currentMinutes < prayerMinutes.fajr) {
+    return { name: 'Isha', emoji: '⭐', key: 'isha' };
+  }
+  
+  return null;
+}
+
+// Helper function to get next prayer and countdown
+export function getNextPrayer(): { name: string; emoji: string; key: string; countdown: string } {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  // Convert prayer times to minutes
+  const prayers = [
+    { name: 'Fajr', emoji: '🌅', key: 'fajr', minutes: 5 * 60 + 30 },
+    { name: 'Dhuhr', emoji: '☀️', key: 'dhuhr', minutes: 12 * 60 + 45 },
+    { name: 'Asr', emoji: '🌤️', key: 'asr', minutes: 16 * 60 + 15 },
+    { name: 'Maghrib', emoji: '🌅', key: 'maghrib', minutes: 19 * 60 + 20 },
+    { name: 'Isha', emoji: '⭐', key: 'isha', minutes: 20 * 60 + 45 },
+  ];
+  
+  // Find next prayer
+  let nextPrayer = prayers.find(p => p.minutes > currentMinutes);
+  let minutesUntil;
+  
+  if (!nextPrayer) {
+    // Next prayer is Fajr tomorrow
+    nextPrayer = prayers[0];
+    minutesUntil = (24 * 60 - currentMinutes) + prayers[0].minutes;
+  } else {
+    minutesUntil = nextPrayer.minutes - currentMinutes;
+  }
+  
+  // Format countdown
+  const hours = Math.floor(minutesUntil / 60);
+  const minutes = minutesUntil % 60;
+  const countdown = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  
+  return {
+    name: nextPrayer.name,
+    emoji: nextPrayer.emoji,
+    key: nextPrayer.key,
+    countdown,
+  };
+}
+
+// Helper function to format date for display
+export function formatDateForDisplay(date: Date): string {
+  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' };
+  return date.toLocaleDateString('en-US', options);
+}
+
+// Helper function to get calendar dates for week view with prayer data
+export async function getCalendarWeekData(startDate: Date): Promise<Array<{
+  date: string;
+  dayName: string;
+  dayNumber: number;
+  isToday: boolean;
+  completionPercentage: number;
+}>> {
+  const dates: Array<{
+    date: string;
+    dayName: string;
+    dayNumber: number;
+    isToday: boolean;
+    completionPercentage: number;
+  }> = [];
+  
+  const today = new Date().toISOString().split('T')[0];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  for (let i = 0; i < 7; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + i);
+    const dateString = currentDate.toISOString().split('T')[0];
+    
+    // Get prayer data for this date
+    let completionPercentage = 0;
+    try {
+      const record = await apiService.getPrayerRecord(dateString);
+      if (record && record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          const completed = getTodayCompletedCount(prayers);
+          completionPercentage = Math.round((completed / 5) * 100);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get prayer data for date:', dateString, error);
+    }
+    
+    dates.push({
+      date: dateString,
+      dayName: dayNames[currentDate.getDay()],
+      dayNumber: currentDate.getDate(),
+      isToday: dateString === today,
+      completionPercentage,
+    });
+  }
+  
+  return dates;
+}
+
+// Helper function to get calendar dates for month view with prayer data
+export async function getCalendarMonthData(monthDate: Date): Promise<Array<{
+  date: string;
+  dayNumber: number;
+  isToday: boolean;
+  isCurrentMonth: boolean;
+  completionPercentage: number;
+}>> {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  
+  // Get first day of month
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  // Get day of week for first day (0 = Sunday)
+  const firstDayOfWeek = firstDay.getDay();
+  
+  // Calculate how many days from previous month to show
+  const daysFromPrevMonth = firstDayOfWeek;
+  
+  // Calculate start date (including previous month days)
+  const startDate = new Date(firstDay);
+  startDate.setDate(firstDay.getDate() - daysFromPrevMonth);
+  
+  const dates: Array<{
+    date: string;
+    dayNumber: number;
+    isToday: boolean;
+    isCurrentMonth: boolean;
+    completionPercentage: number;
+  }> = [];
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Generate 42 days (6 weeks) for calendar grid
+  for (let i = 0; i < 42; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + i);
+    const dateString = currentDate.toISOString().split('T')[0];
+    
+    // Get prayer data for this date
+    let completionPercentage = 0;
+    try {
+      const record = await apiService.getPrayerRecord(dateString);
+      if (record && record.prayers) {
+        const prayers = convertPrayerRecordToDailyPrayers(record);
+        if (prayers) {
+          const completed = getTodayCompletedCount(prayers);
+          completionPercentage = Math.round((completed / 5) * 100);
+        }
+      }
+    } catch (error) {
+      // Silently fail for dates without data
+    }
+    
+    dates.push({
+      date: dateString,
+      dayNumber: currentDate.getDate(),
+      isToday: dateString === today,
+      isCurrentMonth: currentDate.getMonth() === month,
+      completionPercentage,
+    });
+  }
+  
+  return dates;
+}
+
+// Helper function to format date range for calendar view
+export function formatDateRange(viewType: 'week' | 'month', startDate: Date): string {
+  if (viewType === 'week') {
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    const startMonth = startDate.toLocaleDateString('en-US', { month: 'long' });
+    const endMonth = endDate.toLocaleDateString('en-US', { month: 'long' });
+    const year = endDate.getFullYear();
+    
+    if (startMonth === endMonth) {
+      return `${startMonth} ${year}`;
+    } else {
+      return `${startMonth} - ${endMonth} ${year}`;
+    }
+  } else {
+    return startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+}
