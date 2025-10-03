@@ -6,12 +6,14 @@ This is a modern Islamic Prayer Tracker web application that helps Muslims track
 
 **October 3, 2025** - Successfully configured GitHub import for Replit environment:
 - Installed all npm dependencies from package.json
-- Connected to PostgreSQL database and pushed schema using Drizzle
-- Created demo user in database (id: 'demo-user') to satisfy foreign key constraints
+- **Switched to Supabase PostgreSQL database** (transaction pooler on port 6543)
+- Verified database schema exists in Supabase using Drizzle
+- Confirmed demo user (id: 'demo-user') exists in Supabase with user stats
 - Configured workflow with webview output on port 5000 for frontend
 - Set deployment target to autoscale with build and run commands
+- Updated documentation to specify Supabase as required database (NOT Replit database)
 - Verified all pages work correctly: Dashboard, Qaza, Achievements, Analytics
-- Application is fully functional and ready to use
+- Application is fully functional with Supabase and ready to use
 
 **October 2, 2025** - Enhanced Dashboard UI:
 - Added modern calendar date display at top with navigation arrows (Today, October 2 with Hijri date)
@@ -72,9 +74,11 @@ Preferred communication style: Simple, everyday language.
 ## Data Storage Solutions
 
 **Database**
-- PostgreSQL as the primary database via Neon Database (serverless Postgres)
+- PostgreSQL as the primary database via Supabase (serverless Postgres with transaction pooler)
 - Drizzle ORM for type-safe database operations and schema management
-- In-memory storage fallback for development/demo mode when DATABASE_URL is not configured
+- **IMPORTANT:** This project requires Supabase database connection. Do NOT use Replit's built-in PostgreSQL.
+- Transaction pooler (port 6543) used for IPv4 compatibility
+- Demo user (id: 'demo-user') exists in Supabase for development/testing
 
 **Schema Design**
 - `users` table: Authentication with username/email, password hash, profile data
@@ -134,9 +138,9 @@ Preferred communication style: Simple, everyday language.
 # External Dependencies
 
 **Database & ORM**
-- Neon Database (Serverless PostgreSQL) for cloud-hosted database
+- Supabase (Serverless PostgreSQL) for cloud-hosted database
 - Drizzle ORM for type-safe database operations and migrations
-- @neondatabase/serverless for WebSocket-based database connections
+- postgres npm package for database connections via transaction pooler
 
 **UI Component Library**
 - Radix UI primitives (@radix-ui/*) for accessible, unstyled components

@@ -2,6 +2,40 @@
 
 This is a modern Islamic Prayer Tracker web application that helps Muslims track their five daily prayers (Namaz/Salah) with analytics, achievements, and progress visualization. The app provides daily prayer tracking, historical record management (Qaza prayers), streak tracking, and gamification through achievements to encourage consistent prayer habits.
 
+# Setup Instructions
+
+## Database Setup (REQUIRED)
+
+**IMPORTANT: This project requires Supabase PostgreSQL database. Do NOT use Replit's built-in database.**
+
+### Connecting Supabase Database:
+
+1. **Get Supabase Connection String:**
+   - Go to your Supabase project dashboard
+   - Navigate to Settings > Database
+   - Copy the **Transaction Pooler** connection string (uses port 6543)
+   - Format: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
+
+2. **Add to Replit Secrets:**
+   - Open Replit Secrets (lock icon in left sidebar)
+   - Create a new secret named `DATABASE_URL`
+   - Paste your Supabase connection string as the value
+
+3. **Push Database Schema:**
+   ```bash
+   npm run db:push
+   ```
+
+4. **Verify Setup:**
+   - The demo user will be automatically created on first run
+   - Check server logs for "Database: PostgreSQL (Connected)"
+
+### Why Supabase?
+- Transaction pooler support for IPv4 compatibility
+- Serverless PostgreSQL with automatic scaling
+- Better performance and reliability than Replit's database
+- Existing project data is stored in Supabase
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
