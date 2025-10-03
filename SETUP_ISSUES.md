@@ -1,6 +1,6 @@
-# Replit Setup Issues and Solutions
+# Replit Setup Guide
 
-This document outlines the issues encountered while setting up the NamazTracker application in the Replit environment and how they were resolved.
+This document outlines how the NamazTracker application was successfully set up in the Replit environment and serves as a reference for future setups.
 
 ## Issues Encountered
 
@@ -130,24 +130,27 @@ After resolving all issues, the following verification was performed:
 ## Final Configuration Summary
 
 **Environment Variables:**
-- `DATABASE_URL`: `postgresql://postgres:password@helium/heliumdb?sslmode=disable`
+- `DATABASE_URL`: Automatically configured by Replit PostgreSQL service
 - `NODE_ENV`: Set to `development` via cross-env in npm scripts
+- `PORT`: Set to 5000 (required by Replit)
 
 **Workflow:**
+- Name: "Start application"
 - Command: `npm run dev`
 - Port: 5000
 - Output Type: webview
-- Status: Running
+- Status: Running successfully
 
 **Deployment:**
 - Target: autoscale (for stateless web applications)
-- Build: `npm run build` (Vite + esbuild)
+- Build: `npm run build` (Vite frontend + esbuild backend)
 - Run: `npm run start` (production server)
 
 **Database:**
-- Type: PostgreSQL (heliumdb on Replit)
+- Type: PostgreSQL (Replit's built-in database service)
 - Tables: users, prayer_records, achievements, user_stats
-- Demo User: Created with ID 'demo-user'
+- Demo User: Created with ID 'demo-user' for authentication-disabled mode
+- Schema Management: Drizzle ORM with `npm run db:push` for migrations
 
 ---
 

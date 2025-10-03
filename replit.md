@@ -4,16 +4,24 @@ This is a modern Islamic Prayer Tracker web application that helps Muslims track
 
 # Recent Changes
 
-**October 3, 2025** - Successfully configured GitHub import for Replit environment:
-- Installed all npm dependencies from package.json
-- **Switched to Supabase PostgreSQL database** (transaction pooler on port 6543)
-- Verified database schema exists in Supabase using Drizzle
-- Confirmed demo user (id: 'demo-user') exists in Supabase with user stats
-- Configured workflow with webview output on port 5000 for frontend
-- Set deployment target to autoscale with build and run commands
-- Updated documentation to specify Supabase as required database (NOT Replit database)
-- Verified all pages work correctly: Dashboard, Qaza, Achievements, Analytics
-- Application is fully functional with Supabase and ready to use
+**October 3, 2025** - Successfully completed GitHub import setup for Replit environment:
+- Installed all npm dependencies from package.json (cross-env, tsx, vite, etc.)
+- **Provisioned Replit PostgreSQL database** using native Replit database tools
+- Pushed database schema to Replit database using `npm run db:push`
+- Created demo user (id: 'demo-user') with initial user stats for authentication-disabled mode
+- Configured workflow "Start application" with:
+  - Command: `npm run dev`
+  - Output type: `webview` for frontend preview
+  - Port: 5000 (required for Replit environment)
+- Configured deployment settings:
+  - Target: autoscale (stateless web application)
+  - Build: `npm run build` (Vite + esbuild)
+  - Run: `npm run start` (production server)
+- Verified Vite dev server configuration has `allowedHosts: true` for Replit proxy
+- Verified server binds to `0.0.0.0:5000` as required by Replit
+- Tested all API endpoints returning 200 status codes
+- Confirmed all pages work correctly: Dashboard, Qaza, Achievements, Analytics
+- Application is fully functional and ready to use in Replit environment
 
 **October 2, 2025** - Enhanced Dashboard UI:
 - Added modern calendar date display at top with navigation arrows (Today, October 2 with Hijri date)
@@ -74,11 +82,11 @@ Preferred communication style: Simple, everyday language.
 ## Data Storage Solutions
 
 **Database**
-- PostgreSQL as the primary database via Supabase (serverless Postgres with transaction pooler)
+- PostgreSQL as the primary database via Replit's built-in PostgreSQL service
 - Drizzle ORM for type-safe database operations and schema management
-- **IMPORTANT:** This project requires Supabase database connection. Do NOT use Replit's built-in PostgreSQL.
-- Transaction pooler (port 6543) used for IPv4 compatibility
-- Demo user (id: 'demo-user') exists in Supabase for development/testing
+- Database connection managed via DATABASE_URL environment variable (automatically configured)
+- Schema migrations handled with `npm run db:push` command (Drizzle Kit)
+- Demo user (id: 'demo-user') created for authentication-disabled development mode
 
 **Schema Design**
 - `users` table: Authentication with username/email, password hash, profile data
