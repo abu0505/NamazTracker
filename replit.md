@@ -89,6 +89,9 @@ Preferred communication style: Simple, everyday language.
 **Database**
 - PostgreSQL as the primary database via **Supabase** (serverless Postgres with transaction pooler)
 - Drizzle ORM for type-safe database operations and schema management
+- - Database connection managed via DATABASE_URL secret (stored in Replit Secrets)
+- Connection string: `postgresql://postgres.zckrejjslfpmgiiafwbv:Abuturab@3110@aws-1-ap-south-1.pooler.supabase.com:6543/postgres`
+- 
 - Database connection managed via DATABASE_URL secret (stored in Replit Secrets panel)
 - **IMPORTANT:** After importing from GitHub, you MUST set the DATABASE_URL secret in Replit:
   1. Click on "Secrets" (🔒) in the left sidebar
