@@ -4,11 +4,18 @@ This is a modern Islamic Prayer Tracker web application that helps Muslims track
 
 # Recent Changes
 
+**October 4, 2025** - Successfully connected project to Supabase database:
+- ✅ Configured DATABASE_URL secret to point to Supabase PostgreSQL (transaction pooler on port 6543)
+- ✅ Verified database schema exists in Supabase (all tables: users, prayer_records, achievements, user_stats)
+- ✅ Confirmed demo user exists in Supabase database
+- ✅ Tested all API endpoints - returning 200 status codes with Supabase connection
+- ✅ Verified preview is available and fully functional at http://0.0.0.0:5000
+- ✅ Updated documentation to reflect Supabase setup
+- 📝 **Important Note for GitHub Imports:** Always set DATABASE_URL secret after importing from GitHub, as secrets are not included in repository files
+
 **October 3, 2025** - Successfully completed GitHub import setup for Replit environment:
 - Installed all npm dependencies from package.json (cross-env, tsx, vite, etc.)
-- **Provisioned Replit PostgreSQL database** using native Replit database tools
-- Pushed database schema to Replit database using `npm run db:push`
-- Created demo user (id: 'demo-user') with initial user stats for authentication-disabled mode
+- Cleaned up duplicate file structure (removed nested server/server/, server/client/, server/shared/)
 - Configured workflow "Start application" with:
   - Command: `npm run dev`
   - Output type: `webview` for frontend preview
@@ -19,8 +26,6 @@ This is a modern Islamic Prayer Tracker web application that helps Muslims track
   - Run: `npm run start` (production server)
 - Verified Vite dev server configuration has `allowedHosts: true` for Replit proxy
 - Verified server binds to `0.0.0.0:5000` as required by Replit
-- Tested all API endpoints returning 200 status codes
-- Confirmed all pages work correctly: Dashboard, Qaza, Achievements, Analytics
 - Application is fully functional and ready to use in Replit environment
 
 **October 2, 2025** - Enhanced Dashboard UI:
@@ -82,11 +87,16 @@ Preferred communication style: Simple, everyday language.
 ## Data Storage Solutions
 
 **Database**
-- PostgreSQL as the primary database via Replit's built-in PostgreSQL service
+- PostgreSQL as the primary database via **Supabase** (serverless Postgres with transaction pooler)
 - Drizzle ORM for type-safe database operations and schema management
-- Database connection managed via DATABASE_URL environment variable (automatically configured)
+- Database connection managed via DATABASE_URL secret (stored in Replit Secrets panel)
+- **IMPORTANT:** After importing from GitHub, you MUST set the DATABASE_URL secret in Replit:
+  1. Click on "Secrets" (🔒) in the left sidebar
+  2. Add a new secret with key: `DATABASE_URL`
+  3. Set the value to your Supabase connection string (format: `postgresql://postgres.[project]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`)
 - Schema migrations handled with `npm run db:push` command (Drizzle Kit)
-- Demo user (id: 'demo-user') created for authentication-disabled development mode
+- Demo user (id: 'demo-user') exists in Supabase for authentication-disabled development mode
+- **This project uses Supabase, NOT Replit's PostgreSQL database**
 
 **Schema Design**
 - `users` table: Authentication with username/email, password hash, profile data
@@ -190,9 +200,10 @@ Preferred communication style: Simple, everyday language.
 - Frontend workflow configured with webview output type on port 5000
 
 **Database**
-- Using Replit PostgreSQL (heliumdb) with DATABASE_URL environment variable
-- Demo user created with id 'demo-user' for development testing
-- All required tables exist: users, prayer_records, achievements, user_stats
+- Using **Supabase PostgreSQL** with DATABASE_URL secret (configured in Replit Secrets panel)
+- Demo user exists with id 'demo-user' for development testing
+- All required tables exist in Supabase: users, prayer_records, achievements, user_stats
+- **Remember:** DATABASE_URL must be manually set in Secrets after each GitHub import
 
 **Deployment**
 - Deployment target: autoscale (stateless web app)
